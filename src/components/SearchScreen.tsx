@@ -40,7 +40,7 @@ export default function SearchScreen({ onSelect, onLocation, onDebugId }: Props)
     <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(180deg, #007B97 0%, #005A7F 100%)' }}>
 
       {/* Input row — fixed at top */}
-      <div className="px-4 pt-14 pb-5 bg-white sticky top-0 z-10" style={{ borderRadius: '0 0 24px 24px' }}>
+      <div className="px-4 pb-5 bg-white sticky top-0 z-10" style={{ borderRadius: '0 0 24px 24px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}>
         <div className="flex items-center gap-3">
           <input
             type="text"
