@@ -48,7 +48,7 @@ export default function SearchScreen({ onSelect, onLocation, onDebugId }: Props)
             onChange={e => setQuery(e.target.value)}
             placeholder="Your Address"
             autoFocus
-            className="flex-1 border-2 border-blue-400 rounded-full px-5 py-3 text-sm outline-none focus:border-blue-500 placeholder-gray-400 bg-white"
+            className="flex-1 border-2 border-blue-400 rounded-full px-5 py-3 text-base outline-none focus:border-blue-500 placeholder-gray-400 bg-white"
           />
           <LocationButton onClick={onLocation} />
         </div>

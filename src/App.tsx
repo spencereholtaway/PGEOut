@@ -109,12 +109,24 @@ export default function App() {
     }, REFRESH_MS)
   }, [runQuery])
 
-  // On mount, re-query if we restored a saved location
+  // On mount: set initial history state + re-query saved location
   useEffect(() => {
+    window.history.replaceState({ screen: saved ? 'results' : 'search' }, '')
     if (saved) {
       runQuery(saved).then(() => setLastChecked(new Date()))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Handle browser back/forward (popstate)
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      const s: Screen = e.state?.screen ?? 'results'
+      setScreen(s)
+      if (s !== 'detail') setSelectedOutage(null)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
   // Start refresh loop when on results screen
@@ -168,11 +180,11 @@ export default function App() {
   function handleNearbyTap(outage: OutageFeature) {
     setSelectedOutage(outage)
     setScreen('detail')
+    window.history.pushState({ screen: 'detail' }, '')
   }
 
   function handleBackFromDetail() {
-    setScreen('results')
-    setSelectedOutage(null)
+    window.history.back() // triggers popstate which updates screen state
   }
 
   async function handleDebugId(id: number) {
