@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+.card {
+  border-radius: 16px;
+  background: linear-gradient(180deg, #FFF 75%, #F1F4F8 100%);
+  box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.12);
+}
+
+.card-info {
+  border-radius: 16px;
+  background: #FFF;
+  box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.12);
+}
+
+.body-text {
+  color: #4F4F4F;
+  font-family: "Instrument Sans", system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  text-align: center;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  font-family: 'Instrument Sans', system-ui, -apple-system, sans-serif;
+}
