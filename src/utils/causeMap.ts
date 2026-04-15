@@ -8,7 +8,13 @@ export const CAUSE_LABELS: Record<string, string> = {
   'REPLCE SRVC':        'Replacing service line',
   'BRKN UG EQUIPMNT':   'Broken underground equipment',
   'BRKN POLE EQUIPMNT': 'Broken pole equipment',
+  'BRKN POLE':          'Broken pole',
   'POLE FIRE':          'Pole fire',
+  'CAR POLE':           'Vehicle struck a power pole',
+  'FOREIGN OBJ':        'Foreign object contact',
+  'NG CONNECTION':      'Faulty connection',
+  'THRD PARTY':         'Third party damage',
+  'WM - VEG Removal':   'Vegetation removal',
   'Awaiting Investigation': 'Awaiting investigation',
 }
 
