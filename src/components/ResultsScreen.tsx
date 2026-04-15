@@ -37,7 +37,7 @@ export default function ResultsScreen({
     <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(180deg, #007B97 0%, #005A7F 100%)' }}>
 
       {/* Header */}
-      <div className="bg-white px-4 pt-14 pb-4 flex items-start justify-between gap-3" style={{ borderRadius: '0 0 24px 24px' }}>
+      <div className="bg-white px-4 pt-14 pb-4 flex items-start justify-between gap-3 sticky top-0 z-10" style={{ borderRadius: '0 0 24px 24px' }}>
         <div className="flex-1 min-w-0">
           <p className="text-xs text-gray-400 mb-0.5">Viewing outages for</p>
           <button
