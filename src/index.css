@@ -28,3 +28,8 @@ html, body, #root {
   -webkit-tap-highlight-color: transparent;
   font-family: 'Instrument Sans', system-ui, -apple-system, sans-serif;
 }
+
+body {
+  padding-bottom: env(safe-area-inset-bottom);
+  background: #005A7F;
+}
