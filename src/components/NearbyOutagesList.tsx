@@ -72,7 +72,7 @@ export default function NearbyOutagesList({ outages, userLat, userLng, onTap }: 
         Nearby outages
       </p>
       <div className="flex flex-col gap-3">
-        {outages.map((o, i) => (
+        {outages.map((o) => (
           <NearbyOutageItem
             key={o.properties.IncidentId}
             outage={o}
