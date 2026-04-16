@@ -12,6 +12,23 @@
   box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.12);
 }
 
+.btn-primary {
+  display: block;
+  width: 100%;
+  background: #2F80ED;
+  border: 1px solid #2F80ED;
+  border-radius: 100px;
+  padding: 14px 24px;
+  box-shadow: 0 2px 12px 0 rgba(47, 128, 237, 0.20);
+  font-family: "Instrument Sans", system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+  color: #fff;
+  text-align: center;
+  text-decoration: none;
+}
+
 .body-text {
   color: #4F4F4F;
   font-family: "Instrument Sans", system-ui, sans-serif;
