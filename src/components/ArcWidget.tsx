@@ -39,22 +39,30 @@ function formatTime(ms: number): string {
 
 export default function ArcWidget({ startMs, etaMs }: Props) {
   const [, setTick] = useState(0)
+  const [animated, setAnimated] = useState(false)
+
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 30_000)
     return () => clearInterval(id)
   }, [])
 
+  useEffect(() => {
+    const id = setTimeout(() => setAnimated(true), 50)
+    return () => clearTimeout(id)
+  }, [])
+
   const ms        = etaMs ? remainingMs(etaMs) : null
   const isOverdue = ms === 0
   const pct       = (startMs && etaMs) ? arcFillPct(startMs, etaMs) : 0
-  const fillLen   = (pct / 100) * ARC_LENGTH
+  const fillLen   = animated ? (pct / 100) * ARC_LENGTH : 0
+
+  const arcColor  = pct >= 67 ? '#219653' : pct >= 34 ? '#F2994A' : '#EB5757'
 
   const trackDash = `${ARC_LENGTH} ${GAP_LENGTH}`
   const fillDash  = `${fillLen} ${CIRCUMFERENCE - fillLen}`
 
-  // Dot at end of fill
-  const dotAngleDeg = START_ANGLE_DEG + (pct / 100) * ARC_DEG
-  const dot = angleToXY(dotAngleDeg)
+  // Dot at end of fill — always positioned at arc start, rotated via CSS to match fill
+  const dot = angleToXY(START_ANGLE_DEG)
 
   // Arc endpoint positions for timestamp labels
   const startPt = angleToXY(START_ANGLE_DEG)
@@ -76,13 +84,21 @@ export default function ArcWidget({ startMs, etaMs }: Props) {
           {/* Fill */}
           <circle
             cx={CX} cy={CY} r={R}
-            fill="none" stroke="#F97316" strokeWidth={STROKE}
+            fill="none" stroke={arcColor} strokeWidth={STROKE}
             strokeLinecap="round" strokeDasharray={fillDash}
             transform={ROTATE}
+            style={{ transition: 'stroke-dasharray 1s ease-out' }}
           />
-          {/* Dot marker */}
+          {/* Dot marker — rotates with the fill animation */}
           {(startMs && etaMs) && (
-            <circle cx={dot.x} cy={dot.y} r={STROKE / 2} fill="#F97316" />
+            <circle
+              cx={dot.x} cy={dot.y} r={STROKE / 2} fill={arcColor}
+              style={{
+                transformOrigin: `${CX}px ${CY}px`,
+                transform: `rotate(${animated ? (pct / 100) * ARC_DEG : 0}deg)`,
+                transition: 'transform 1s ease-out',
+              }}
+            />
           )}
           {/* Start time — anchored under left arc end */}
           {startMs && (
