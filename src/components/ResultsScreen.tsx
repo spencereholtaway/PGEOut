@@ -79,7 +79,7 @@ export default function ResultsScreen({
           <div className="card-info p-6 text-center flex flex-col gap-4">
             <p style={{ color: '#219653', fontFamily: '"Instrument Sans"', fontSize: 24, fontWeight: 700, textAlign: 'center' }}>No outages reported</p>
             <div>
-              <p className="body-text mb-3">Your local utility is not reporting any outages at this time.</p>
+              <p className="body-text mb-3">Your local utility is not reporting any outages for your location at this time.</p>
               <p className="body-text">Many utilities refresh their data every 15 minutes. Be sure to check back again soon if you are experiencing an outage, or report one below.</p>
             </div>
             <a
