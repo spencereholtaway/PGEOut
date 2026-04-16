@@ -76,43 +76,32 @@ export default function ResultsScreen({
         )}
 
         {state === 'none' && (
-          <>
-            <div className="card-info p-6 text-center">
-              <p className="mb-3" style={{ color: '#219653', fontFamily: '"Instrument Sans"', fontSize: 24, fontWeight: 700, textAlign: 'center' }}>No outages reported</p>
-              <p className="body-text">
-                Your local utility is not reporting any outages at this time.
-                Many utilities refresh their data every 15 minutes.
-                Be sure to check back again soon if you are experiencing an
-                outage, or report one below.
-              </p>
+          <div className="card-info p-6 text-center flex flex-col gap-4">
+            <p style={{ color: '#219653', fontFamily: '"Instrument Sans"', fontSize: 24, fontWeight: 700, textAlign: 'center' }}>No outages reported</p>
+            <div>
+              <p className="body-text mb-3">Your local utility is not reporting any outages at this time.</p>
+              <p className="body-text">Many utilities refresh their data every 15 minutes. Be sure to check back again soon if you are experiencing an outage, or report one below.</p>
             </div>
-
-            <div className="card-info p-6">
-              <p className="mb-5" style={{ color: '#219653', fontFamily: '"Instrument Sans"', fontSize: 24, fontWeight: 700, textAlign: 'center' }}>Report an outage</p>
-
-              <a
-                href={PGE_REPORT_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full text-white text-center rounded-full active:opacity-80 transition-opacity overflow-hidden"
-                style={{
-                  background: '#2F80ED',
-                  border: '1px solid #2F80ED',
-                  borderRadius: 100,
-                  padding: '16px 24px',
-                  boxShadow: '0 2px 12px 0 rgba(47,128,237,0.20)',
-                  fontFamily: '"Instrument Sans"',
-                  fontSize: 20,
-                  fontWeight: 400,
-                  lineHeight: '19px',
-                  whiteSpace: 'nowrap',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                PG&amp;E
-              </a>
-            </div>
-          </>
+            <a
+              href={PGE_REPORT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full text-white text-center rounded-full active:opacity-80 transition-opacity overflow-hidden"
+              style={{
+                background: '#2F80ED',
+                border: '1px solid #2F80ED',
+                borderRadius: 100,
+                padding: '16px 24px',
+                boxShadow: '0 2px 12px 0 rgba(47,128,237,0.20)',
+                fontFamily: '"Instrument Sans"',
+                fontSize: 20,
+                fontWeight: 400,
+                lineHeight: '19px',
+              }}
+            >
+              Report an outage to PG&amp;E
+            </a>
+          </div>
         )}
 
         {state === 'outages' && sorted[0] && (
