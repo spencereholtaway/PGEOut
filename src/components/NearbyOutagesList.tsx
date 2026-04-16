@@ -32,16 +32,13 @@ export default function NearbyOutagesList({ outages, userLat, userLng, onTap }: 
               onClick={() => onTap(o)}
             >
               {/* Left: badge + distance on same row */}
-              <div className="flex items-center gap-2.5">
-                <div style={{ width: 110 }} className="flex">
-                  <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider ${
-                    isPlanned
-                      ? 'bg-green-500 text-white'
-                      : 'bg-orange-400 text-white'
-                  }`}>
-                    {isPlanned ? 'Planned' : 'Not Planned'}
-                  </span>
-                </div>
+              <div className="flex items-center gap-3">
+                <span
+                  className={`rounded-full px-3 py-1 whitespace-nowrap ${isPlanned ? 'bg-green-500' : 'bg-orange-400'}`}
+                  style={{ color: '#FFF', fontFamily: '"Instrument Sans"', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', textAlign: 'center' }}
+                >
+                  {isPlanned ? 'Planned' : 'Not Planned'}
+                </span>
                 {distLabel && (
                   <span className="text-sm text-gray-400">{distLabel}</span>
                 )}
