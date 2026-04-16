@@ -58,8 +58,10 @@ export default function ArcWidget({ startMs, etaMs }: Props) {
 
   const arcColor  = pct >= 67 ? '#219653' : pct >= 34 ? '#F2994A' : '#EB5757'
 
-  const trackDash = `${ARC_LENGTH} ${GAP_LENGTH}`
-  const fillDash  = `${fillLen} ${CIRCUMFERENCE - fillLen}`
+  const trackDash  = `${ARC_LENGTH} ${GAP_LENGTH}`
+  // Fixed dasharray + animated dashoffset — far better Safari support than animating dasharray
+  const fillDash   = `${ARC_LENGTH} ${GAP_LENGTH}`
+  const fillOffset = ARC_LENGTH - fillLen
 
   // Dot at end of fill — always positioned at arc start, rotated via CSS to match fill
   const dot = angleToXY(START_ANGLE_DEG)
@@ -85,9 +87,9 @@ export default function ArcWidget({ startMs, etaMs }: Props) {
           <circle
             cx={CX} cy={CY} r={R}
             fill="none" stroke={arcColor} strokeWidth={STROKE}
-            strokeLinecap="round" strokeDasharray={fillDash}
+            strokeLinecap="round" strokeDasharray={fillDash} strokeDashoffset={fillOffset}
             transform={ROTATE}
-            style={{ transition: 'stroke-dasharray 1s ease-out' }}
+            style={{ transition: 'stroke-dashoffset 1s ease-out' }}
           />
           {/* Dot marker — rotates with the fill animation */}
           {(startMs && etaMs) && (
