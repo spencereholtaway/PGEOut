@@ -38,10 +38,11 @@ export default function MiniArc({ startMs, etaMs, triggerAnimation }: Props) {
     if (triggerAnimation) setAnimated(true)
   }, [triggerAnimation])
 
+  const isOverdue = etaMs !== null && etaMs <= Date.now()
   const pct      = (startMs && etaMs) ? arcFillPct(startMs, etaMs) : 0
   const fillLen  = animated ? (pct / 100) * ARC_LENGTH : 0
   const fillDash = `${fillLen} ${CIRCUMFERENCE - fillLen}`
-  const arcColor = pct >= 67 ? '#219653' : pct >= 34 ? '#F2994A' : '#EB5757'
+  const arcColor = isOverdue ? '#EB5757' : pct >= 67 ? '#219653' : pct >= 34 ? '#F2994A' : '#EB5757'
 
   return (
     <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ flexShrink: 0 }}>
