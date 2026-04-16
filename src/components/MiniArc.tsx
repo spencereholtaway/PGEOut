@@ -38,11 +38,10 @@ export default function MiniArc({ startMs, etaMs, triggerAnimation }: Props) {
     if (triggerAnimation) setAnimated(true)
   }, [triggerAnimation])
 
-  const pct        = (startMs && etaMs) ? arcFillPct(startMs, etaMs) : 0
-  const fillLen    = animated ? (pct / 100) * ARC_LENGTH : 0
-  const fillDash   = `${ARC_LENGTH} ${GAP_LENGTH}`
-  const fillOffset = ARC_LENGTH - fillLen
-  const arcColor   = pct >= 67 ? '#219653' : pct >= 34 ? '#F2994A' : '#EB5757'
+  const pct      = (startMs && etaMs) ? arcFillPct(startMs, etaMs) : 0
+  const fillLen  = animated ? (pct / 100) * ARC_LENGTH : 0
+  const fillDash = `${fillLen} ${CIRCUMFERENCE - fillLen}`
+  const arcColor = pct >= 67 ? '#219653' : pct >= 34 ? '#F2994A' : '#EB5757'
 
   return (
     <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ flexShrink: 0 }}>
@@ -57,9 +56,9 @@ export default function MiniArc({ startMs, etaMs, triggerAnimation }: Props) {
       <circle
         cx={CX} cy={CY} r={R}
         fill="none" stroke={arcColor} strokeWidth={STROKE}
-        strokeLinecap="round" strokeDasharray={fillDash} strokeDashoffset={fillOffset}
+        strokeLinecap="round" strokeDasharray={fillDash}
         transform={ROTATE}
-        style={{ transition: 'stroke-dashoffset 1s ease-out' }}
+        style={{ transition: 'stroke-dasharray 1s ease-out' }}
       />
     </svg>
   )
