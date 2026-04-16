@@ -1,5 +1,6 @@
 import { ChevronLeft } from 'lucide-react'
 import OutageCard from './OutageCard'
+import { formatDistance, haversine } from '../utils/distance'
 import type { OutageFeature } from '../api/outages'
 
 interface Props {
@@ -10,6 +11,11 @@ interface Props {
 }
 
 export default function OutageDetailScreen({ outage, userLat, userLng, onBack }: Props) {
+  const { centroid } = outage
+  const distLabel = centroid
+    ? formatDistance(haversine(userLat, userLng, centroid.y, centroid.x))
+    : null
+
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(180deg, #007B97 0%, #005A7F 100%)' }}>
 
@@ -23,7 +29,7 @@ export default function OutageDetailScreen({ outage, userLat, userLng, onBack }:
           <ChevronLeft className="w-6 h-6 text-gray-700" />
         </button>
         <p className="flex-1 text-center text-gray-700 font-semibold text-base pr-7">
-          Nearby outage
+          Nearby Outage{distLabel ? `: ${distLabel} away` : ''}
         </p>
       </div>
 

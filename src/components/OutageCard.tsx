@@ -1,6 +1,5 @@
 import ArcWidget from './ArcWidget'
 import { getCauseLabel } from '../utils/causeMap'
-import { formatDistance, haversine } from '../utils/distance'
 import type { OutageFeature } from '../api/outages'
 
 interface Props {
@@ -11,29 +10,22 @@ interface Props {
 
 const PGE_URL = 'https://pgealerts.alerts.pge.com/outagecenter/'
 
-export default function OutageCard({ outage, userLat, userLng }: Props) {
-  const { properties: p, centroid } = outage
+export default function OutageCard({ outage }: Props) {
+  const { properties: p } = outage
   const isPlanned = p.OutageType === 'Planned'
-
-  const distLabel = centroid
-    ? formatDistance(haversine(userLat, userLng, centroid.y, centroid.x))
-    : null
+  const isOverdue = p.EstimatedRestoreDate !== null && p.EstimatedRestoreDate <= Date.now()
 
   return (
-    <div className="card p-6 flex flex-col items-center gap-3">
+    <div className="card p-6 flex flex-col items-center gap-4">
 
-      {/* Badge + distance */}
-      <div className="flex items-center justify-center gap-2.5">
-        <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider ${
-          isPlanned
-            ? 'bg-green-500 text-white'
-            : 'bg-orange-400 text-white'
-        }`}>
+      {/* Badge */}
+      <div className="flex items-center justify-center">
+        <span
+          className="text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider text-white"
+          style={{ background: isPlanned ? '#219653' : '#F2994A' }}
+        >
           {isPlanned ? 'Planned' : 'Not Planned'}
         </span>
-        {distLabel && (
-          <span className="text-sm text-gray-400">{distLabel}</span>
-        )}
       </div>
 
       {/* Cause */}
@@ -44,25 +36,19 @@ export default function OutageCard({ outage, userLat, userLng }: Props) {
       {/* Arc */}
       <ArcWidget startMs={p.StartDate} etaMs={p.EstimatedRestoreDate} />
 
+      {/* Overdue subtext */}
+      {isOverdue && (
+        <p className="text-center px-2 leading-relaxed" style={{ fontSize: 14, color: '#4F4F4F', marginTop: -16 }}>
+          Your utility is working on the outage past the estimated restoration time.
+        </p>
+      )}
+
       {/* Learn more */}
       <a
         href={PGE_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full text-white text-center rounded-full active:opacity-80 transition-opacity flex items-center justify-center gap-2 overflow-hidden"
-        style={{
-          background: '#2F80ED',
-          border: '1px solid #2F80ED',
-          borderRadius: 100,
-          padding: '16px 24px',
-          boxShadow: '0 2px 12px 0 rgba(47,128,237,0.20)',
-          fontFamily: '"Instrument Sans"',
-          fontSize: 20,
-          fontWeight: 400,
-          lineHeight: '19px',
-          whiteSpace: 'nowrap',
-          textOverflow: 'ellipsis',
-        }}
+        className="btn-primary active:opacity-80 transition-opacity"
       >
         Learn more at PG&amp;E
       </a>

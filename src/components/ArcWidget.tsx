@@ -22,7 +22,8 @@ const END_ANGLE_DEG   = START_ANGLE_DEG + ARC_DEG  // 390 = 30°
 
 const ROTATE = `rotate(${START_ANGLE_DEG}, ${CX}, ${CY})`
 
-const SVG_HEIGHT = SIZE
+// Trim bottom of SVG — labels sit at y≈186 (13px font), so 200px clips the dead space
+const SVG_HEIGHT = 200
 
 function angleToXY(deg: number) {
   const rad = (deg * Math.PI) / 180
@@ -51,12 +52,12 @@ export default function ArcWidget({ startMs, etaMs }: Props) {
     return () => clearTimeout(id)
   }, [])
 
-  const ms        = etaMs ? remainingMs(etaMs) : null
-  const isOverdue = ms === 0
-  const pct       = (startMs && etaMs) ? arcFillPct(startMs, etaMs) : 0
+  const ms  = etaMs ? remainingMs(etaMs) : null
+  const pct = (startMs && etaMs) ? arcFillPct(startMs, etaMs) : 0
   const fillLen   = animated ? (pct / 100) * ARC_LENGTH : 0
 
-  const arcColor  = pct >= 67 ? '#219653' : pct >= 34 ? '#F2994A' : '#EB5757'
+  const isOverdue = etaMs !== null && (etaMs <= Date.now())
+  const arcColor  = isOverdue ? '#EB5757' : pct >= 67 ? '#219653' : pct >= 34 ? '#F2994A' : '#EB5757'
 
   const trackDash = `${ARC_LENGTH} ${GAP_LENGTH}`
   const fillDash  = `${fillLen} ${CIRCUMFERENCE - fillLen}`
@@ -70,9 +71,7 @@ export default function ArcWidget({ startMs, etaMs }: Props) {
   const labelY  = startPt.y + STROKE / 2 + 16
 
   return (
-    <div className="flex flex-col items-center w-full">
-      {/* Arc + overlaid text */}
-      <div className="relative" style={{ width: SIZE, height: SVG_HEIGHT }}>
+    <div className="relative" style={{ width: SIZE, height: SVG_HEIGHT }}>
         <svg width={SIZE} height={SVG_HEIGHT} viewBox={`0 0 ${SIZE} ${SVG_HEIGHT}`}>
           {/* Track */}
           <circle
@@ -131,14 +130,6 @@ export default function ArcWidget({ startMs, etaMs }: Props) {
             {etaMs ? formatDuration(ms ?? 0) : 'Unknown'}
           </span>
         </div>
-      </div>
-
-      {/* Overdue subtext */}
-      {isOverdue && etaMs && (
-        <p className="text-xs text-gray-400 text-center mt-1 px-6 leading-relaxed">
-          Your utility is working on the outage past the estimated restoration time.
-        </p>
-      )}
     </div>
   )
 }

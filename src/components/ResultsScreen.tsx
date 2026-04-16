@@ -86,18 +86,7 @@ export default function ResultsScreen({
               href={PGE_REPORT_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="block w-full text-white text-center rounded-full active:opacity-80 transition-opacity overflow-hidden"
-              style={{
-                background: '#2F80ED',
-                border: '1px solid #2F80ED',
-                borderRadius: 100,
-                padding: '14px 24px',
-                boxShadow: '0 2px 12px 0 rgba(47,128,237,0.20)',
-                fontFamily: '"Instrument Sans"',
-                fontSize: 16,
-                fontWeight: 400,
-                lineHeight: '24px',
-              }}
+              className="btn-primary active:opacity-80 transition-opacity"
             >
               Report an outage to PG&amp;E
             </a>
