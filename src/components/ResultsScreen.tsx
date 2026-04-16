@@ -91,12 +91,12 @@ export default function ResultsScreen({
                 background: '#2F80ED',
                 border: '1px solid #2F80ED',
                 borderRadius: 100,
-                padding: '16px 24px',
+                padding: '14px 24px',
                 boxShadow: '0 2px 12px 0 rgba(47,128,237,0.20)',
                 fontFamily: '"Instrument Sans"',
-                fontSize: 20,
+                fontSize: 16,
                 fontWeight: 400,
-                lineHeight: '19px',
+                lineHeight: '24px',
               }}
             >
               Report an outage to PG&amp;E
