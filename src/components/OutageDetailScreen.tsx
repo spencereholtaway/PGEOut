@@ -14,7 +14,7 @@ export default function OutageDetailScreen({ outage, userLat, userLng, onBack }:
     <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(180deg, #007B97 0%, #005A7F 100%)' }}>
 
       {/* Header */}
-      <div className="bg-white px-4 pb-4 flex items-center sticky top-0 z-10" style={{ borderRadius: '0 0 24px 24px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}>
+      <div className="bg-white px-4 pb-4 flex items-center sticky top-0 z-10" style={{ borderRadius: '0 0 24px 24px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)', boxShadow: '0 -2px 44px 0 rgba(0,0,0,0.05)' }}>
         <button
           onClick={onBack}
           aria-label="Back"
