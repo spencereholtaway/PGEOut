@@ -12,13 +12,12 @@ interface Props {
 
 interface ItemProps {
   outage: OutageFeature
-  index: number
   userLat: number
   userLng: number
   onTap: (outage: OutageFeature) => void
 }
 
-function NearbyOutageItem({ outage, index, userLat, userLng, onTap }: ItemProps) {
+function NearbyOutageItem({ outage, userLat, userLng, onTap }: ItemProps) {
   const ref = useRef<HTMLButtonElement>(null)
   const [visible, setVisible] = useState(false)
 
@@ -44,11 +43,6 @@ function NearbyOutageItem({ outage, index, userLat, userLng, onTap }: ItemProps)
       ref={ref}
       className="card-info p-4 flex justify-between items-center w-full text-left"
       onClick={() => onTap(outage)}
-      style={{
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(16px)',
-        transition: `opacity 0.4s ease ${index * 0.12}s, transform 0.4s ease ${index * 0.12}s`,
-      }}
     >
       {/* Left: badge + distance on same row */}
       <div className="flex items-center gap-3">
@@ -82,7 +76,6 @@ export default function NearbyOutagesList({ outages, userLat, userLng, onTap }: 
           <NearbyOutageItem
             key={o.properties.IncidentId}
             outage={o}
-            index={i}
             userLat={userLat}
             userLng={userLng}
             onTap={onTap}
