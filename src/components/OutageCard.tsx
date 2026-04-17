@@ -3,55 +3,42 @@ import { getCauseLabel } from '../utils/causeMap'
 import type { OutageFeature } from '../api/outages'
 
 interface Props {
-  outage: OutageFeature
-  userLat: number
-  userLng: number
+  outage:   OutageFeature
+  userLat:  number
+  userLng:  number
 }
-
-const PGE_URL = 'https://pgealerts.alerts.pge.com/outagecenter/'
 
 export default function OutageCard({ outage }: Props) {
   const { properties: p } = outage
   const isPlanned = p.OutageType === 'Planned'
-  const isOverdue = p.EstimatedRestoreDate !== null && p.EstimatedRestoreDate <= Date.now()
 
   return (
-    <div className="card p-6 flex flex-col items-center gap-4">
-
-      {/* Badge */}
-      <div className="flex items-center justify-center">
-        <span
-          className="text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider text-white"
-          style={{ background: isPlanned ? '#219653' : '#F2994A' }}
-        >
-          {isPlanned ? 'Planned' : 'Not Planned'}
-        </span>
+    <div
+      className="outage-card"
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        height: 367, overflow: 'visible',
+        paddingTop: 64, paddingBottom: 56, gap: 24,
+      }}
+    >
+      {/* Top: badge + cause */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className={`badge ${isPlanned ? 'badge-planned' : 'badge-unplanned'}`}>
+            {isPlanned ? 'Planned' : 'Unplanned'}
+          </span>
+        </div>
+        <p style={{
+          fontFamily: 'var(--font)', fontSize: 20, fontWeight: 300,
+          color: 'var(--text-content)', lineHeight: 'normal',
+          textAlign: 'center', margin: 0,
+        }}>
+          {getCauseLabel(p.Cause)}
+        </p>
       </div>
 
-      {/* Cause */}
-      <p className="text-sm text-gray-500 leading-snug text-center">
-        {getCauseLabel(p.Cause)}
-      </p>
-
-      {/* Arc */}
+      {/* Arc widget */}
       <ArcWidget startMs={p.StartDate} etaMs={p.EstimatedRestoreDate} />
-
-      {/* Overdue subtext */}
-      {isOverdue && (
-        <p className="text-center px-2 leading-relaxed" style={{ fontSize: 14, color: '#4F4F4F', marginTop: -16 }}>
-          Your utility is working on the outage past the estimated restoration time.
-        </p>
-      )}
-
-      {/* Learn more */}
-      <a
-        href={PGE_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="btn-primary active:opacity-80 transition-opacity"
-      >
-        Learn more at PG&amp;E
-      </a>
     </div>
   )
 }

@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function SearchScreen({ onSelect, onLocation, onDebugId }: Props) {
-  const [query, setQuery]           = useState('')
+  const [query, setQuery]             = useState('')
   const [suggestions, setSuggestions] = useState<GeocodeResult[]>([])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -32,35 +32,36 @@ export default function SearchScreen({ onSelect, onLocation, onDebugId }: Props)
   }
 
   const debugMatch = query.match(/^#(\d+)$/)
-  const debugId = debugMatch ? parseInt(debugMatch[1], 10) : null
-
+  const debugId    = debugMatch ? parseInt(debugMatch[1], 10) : null
   const showSuggestions = suggestions.length > 0 || debugId !== null
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(180deg, #007B97 0%, #005A7F 100%)' }}>
+    <div className="app-bg min-h-screen flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
-      {/* Input row — fixed at top */}
-      <div className="px-4 pb-5 bg-white sticky top-0 z-10" style={{ borderRadius: '0 0 24px 24px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)', boxShadow: '0 -2px 44px 0 rgba(0,0,0,0.05)' }}>
-        <div className="flex items-center gap-3">
+      {/* Input bar */}
+      <div className="px-4 sticky top-0 z-10" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 16px)', paddingBottom: 16, background: 'transparent' }}>
+        <div className="address-pill flex items-center gap-3" style={{ padding: '12px 12px 12px 20px' }}>
           <input
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Your Address"
             autoFocus
-            className="flex-1 border-2 border-blue-400 rounded-full px-5 py-3 text-base outline-none focus:border-blue-500 placeholder-gray-400 bg-white"
+            className="flex-1 bg-transparent outline-none"
+            style={{ fontFamily: 'var(--font)', fontSize: 20, fontWeight: 300, color: '#0089C4', lineHeight: '25px' }}
           />
           <LocationButton onClick={onLocation} />
         </div>
       </div>
 
-      {/* Autocomplete list */}
+      {/* Suggestions */}
       {showSuggestions && (
-        <div className="flex flex-col">
+        <div className="flex flex-col px-4 pt-2">
           {debugId !== null ? (
             <button
               onClick={() => { setSuggestions([]); onDebugId?.(debugId) }}
-              className="text-left px-5 py-4 text-sm text-white border-b border-white/20 active:bg-white/10"
+              className="text-left py-4 border-b active:opacity-60 transition-opacity"
+              style={{ fontFamily: 'var(--font)', fontSize: 16, fontWeight: 400, color: 'var(--primary)', borderColor: 'rgba(0,137,196,0.15)' }}
             >
               🔍 Fetch outage #{debugId}
             </button>
@@ -68,7 +69,8 @@ export default function SearchScreen({ onSelect, onLocation, onDebugId }: Props)
             <button
               key={i}
               onClick={() => handleSelect(s)}
-              className="text-left px-5 py-4 text-sm text-white border-b border-white/20 active:bg-white/10"
+              className="text-left py-4 border-b active:opacity-60 transition-opacity"
+              style={{ fontFamily: 'var(--font)', fontSize: 16, fontWeight: 400, color: 'var(--text-muted)', borderColor: 'rgba(0,137,196,0.15)' }}
             >
               {s.label}
             </button>
@@ -76,11 +78,11 @@ export default function SearchScreen({ onSelect, onLocation, onDebugId }: Props)
         </div>
       )}
 
-      {/* Null state — vertically centred in remaining space */}
+      {/* Empty state */}
       {!showSuggestions && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-7 px-10 text-center pb-16">
-          <p className="body-text" style={{ color: '#ffffff' }}>
-            Enter your address or<br />use the location button<br />to find nearby outages.
+        <div className="flex-1 flex flex-col items-center justify-center gap-8 px-10 text-center pb-20">
+          <p style={{ fontFamily: 'var(--font)', fontSize: 20, fontWeight: 300, color: 'var(--text-muted)', lineHeight: '28px' }}>
+            Enter your address or use<br />the location button to find<br />nearby outages.
           </p>
           <LocationButton onClick={onLocation} />
         </div>
@@ -94,12 +96,8 @@ function LocationButton({ onClick }: { onClick: () => void }) {
     <button
       onClick={onClick}
       aria-label="Use my location"
-      className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 active:opacity-80 transition-opacity"
-      style={{
-        background: '#2F80ED',
-        border: '1px solid #2F80ED',
-        boxShadow: '0 2px 12px 0 rgba(47,128,237,0.20)',
-      }}
+      className="flex items-center justify-center flex-shrink-0 active:opacity-75 transition-opacity"
+      style={{ width: 44, height: 44, borderRadius: '50%', background: '#0089C4', border: '1px solid #0089C4', boxShadow: '0 2px 12px 0 rgba(0,137,196,0.25)' }}
     >
       <Navigation className="w-5 h-5 text-white" />
     </button>

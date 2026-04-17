@@ -1,6 +1,9 @@
+import pgeLogo    from '../assets/pge-logo.png'
+import menuIcon   from '../assets/icon-menu.svg'
+import pencilIcon from '../assets/icon-pencil.svg'
+import externalIcon from '../assets/icon-external.svg'
 import OutageCard from './OutageCard'
 import NearbyOutagesList from './NearbyOutagesList'
-import { Navigation } from 'lucide-react'
 import { haversine } from '../utils/distance'
 import type { OutageFeature } from '../api/outages'
 
@@ -9,15 +12,15 @@ const PGE_REPORT_URL = 'https://www.pge.com/en/contact-us/report-an-issue/report
 type ResultState = 'outages' | 'none' | 'outside' | 'error' | 'loading'
 
 interface Props {
-  state: ResultState
-  outages: OutageFeature[]
-  address: string
-  userLat: number
-  userLng: number
-  lastChecked: Date | null
-  onAddressTap: () => void
-  onLocationTap: () => void
-  nearbyOutages: OutageFeature[]
+  state:           ResultState
+  outages:         OutageFeature[]
+  address:         string
+  userLat:         number
+  userLng:         number
+  lastChecked:     Date | null
+  onAddressTap:    () => void
+  onLocationTap:   () => void
+  nearbyOutages:   OutageFeature[]
   onNearbyTap: (outage: OutageFeature) => void
 }
 
@@ -33,106 +36,134 @@ export default function ResultsScreen({
     return da - db
   })
 
-  return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(180deg, #007B97 0%, #005A7F 100%)' }}>
+  // Split address into street + city for display
+  const parts      = address.split(',')
+  const streetPart = parts[0]?.trim() ?? address
+  const cityPart   = parts.slice(1).join(',').trim()
 
-      {/* Header */}
-      <div className="bg-white px-4 pb-4 flex items-start justify-between gap-3 sticky top-0 z-10" style={{ borderRadius: '0 0 24px 24px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)', boxShadow: '0 -2px 44px 0 rgba(0,0,0,0.05)' }}>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-gray-400 mb-0.5">Viewing outages for</p>
-          <button
-            onClick={onAddressTap}
-            className="text-blue-500 text-sm font-medium truncate block w-full text-left"
-          >
-            {address}
-          </button>
+  void onLocationTap
+
+  return (
+    <div className="app-bg min-h-screen flex flex-col">
+
+      {/* Rectangle 2 — spec 59:170: 290px gradient fade, sits over scroll content */}
+      <div className="sticky-gradient" />
+
+      {/* Sticky header — spec 59:171: h-[222px] flex-col gap-[16px] justify-end px-[16px] */}
+      <div
+        className="sticky top-0 z-10"
+        style={{
+          height: 'calc(222px + env(safe-area-inset-top))',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'flex-end',
+          gap: 16,
+          padding: '0 16px',
+        }}
+      >
+        {/* "Outages affecting" label row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <img src={pgeLogo} alt="PG&E" style={{ width: 32, height: 34, flexShrink: 0 }} />
+          <span style={{ fontFamily: 'var(--font)', fontSize: 24, fontWeight: 400, color: 'var(--text-muted)', lineHeight: 'normal', flex: 1 }}>
+            Outages affecting
+          </span>
+          <img src={menuIcon} alt="Menu" style={{ width: 24, height: 24, flexShrink: 0 }} />
         </div>
-        <LocationButton onClick={onLocationTap} />
+
+        {/* Address pill — tappable */}
+        <button
+          onClick={onAddressTap}
+          className="address-pill active:opacity-75 transition-opacity w-full text-left"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '16px 20px 16px 16px' }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontFamily: 'var(--font)', fontSize: 32, fontWeight: 300, color: '#0089C4', lineHeight: 'normal', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {streetPart}
+            </p>
+            {cityPart && (
+              <p style={{ fontFamily: 'var(--font)', fontSize: 16, fontWeight: 400, color: '#0089C4', lineHeight: 'normal', margin: 0 }}>
+                {cityPart}
+              </p>
+            )}
+          </div>
+          <img src={pencilIcon} alt="Edit" style={{ width: 24, height: 24, flexShrink: 0 }} />
+        </button>
       </div>
 
       {/* Body */}
-      <div className="flex-1 px-4 flex flex-col" style={{ paddingTop: 24, paddingBottom: 24, gap: 24 }}>
+      <div className="flex-1 flex flex-col" style={{ position: 'relative', zIndex: 1 }}>
 
         {state === 'loading' && (
           <div className="flex-1 flex items-center justify-center pt-20">
-            <div className="w-8 h-8 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'rgba(0,137,196,0.2)', borderTopColor: '#0089C4' }} />
           </div>
         )}
 
         {state === 'error' && (
-          <div className="card-info p-6 text-center">
-            <p className="text-gray-700 font-semibold mb-1">Unable to load outages</p>
-            <p className="text-sm text-gray-400">Check your connection and try again.</p>
+          <div className="mx-4 mt-6 p-6 text-center" style={{ background: '#fff', borderRadius: 16, border: '1px solid var(--stroke)' }}>
+            <p style={{ fontFamily: 'var(--font)', fontWeight: 500, color: '#333', marginBottom: 4 }}>Unable to load outages</p>
+            <p style={{ fontFamily: 'var(--font)', fontSize: 14, color: 'var(--text-muted)' }}>Check your connection and try again.</p>
           </div>
         )}
 
         {state === 'outside' && (
-          <div className="card-info p-6 text-center">
-            <p className="mb-2" style={{ color: '#219653', fontFamily: '"Instrument Sans"', fontSize: 24, fontWeight: 700, textAlign: 'center' }}>
-              You're outside of our<br />coverage area.
+          <div className="mx-4 mt-6 p-6" style={{ background: '#fff', borderRadius: 16, border: '1px solid var(--stroke)' }}>
+            <p style={{ fontFamily: 'var(--font)', fontSize: 20, fontWeight: 500, color: 'var(--planned)', marginBottom: 8 }}>
+              You're outside our coverage area.
             </p>
-            <p className="text-sm text-gray-400">We can't report on outages for your location.</p>
+            <p style={{ fontFamily: 'var(--font)', fontSize: 16, fontWeight: 300, color: 'var(--text-muted)' }}>
+              We can't report on outages for your location.
+            </p>
           </div>
         )}
 
         {state === 'none' && (
-          <div className="card-info p-6 text-center flex flex-col gap-4">
-            <p style={{ color: '#219653', fontFamily: '"Instrument Sans"', fontSize: 24, fontWeight: 700, textAlign: 'center' }}>No outages reported</p>
-            <div>
-              <p className="body-text mb-3">Your local utility is not reporting any outages for your location at this time.</p>
-              <p className="body-text">Many utilities refresh their data every 15 minutes. Be sure to check back again soon if you are experiencing an outage, or report one below.</p>
-            </div>
-            <a
-              href={PGE_REPORT_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary active:opacity-80 transition-opacity"
-            >
-              Report an outage to PG&amp;E
-            </a>
+          <div className="mx-4 mt-6 p-6" style={{ background: '#fff', borderRadius: 16, border: '1px solid var(--stroke)' }}>
+            <p style={{ fontFamily: 'var(--font)', fontSize: 20, fontWeight: 500, color: 'var(--planned)', marginBottom: 8 }}>
+              No outages reported
+            </p>
+            <p style={{ fontFamily: 'var(--font)', fontSize: 16, fontWeight: 300, color: 'var(--text-muted)', lineHeight: '22px' }}>
+              Your local utility is not reporting any outages for your location at this time. Many utilities refresh every 15 minutes — check back soon if you're experiencing an outage.
+            </p>
           </div>
         )}
 
         {state === 'outages' && sorted[0] && (
-          <OutageCard
-            outage={sorted[0]}
-            userLat={userLat}
-            userLng={userLng}
-          />
+          <OutageCard outage={sorted[0]} userLat={userLat} userLng={userLng} />
         )}
 
+        {/* Nearby outages */}
         {(state === 'outages' || state === 'none') && nearbyOutages.length > 0 && (
-          <NearbyOutagesList
-            outages={nearbyOutages}
-            userLat={userLat}
-            userLng={userLng}
-            onTap={onNearbyTap}
-          />
+          <div className="mx-4">
+            <NearbyOutagesList outages={nearbyOutages} userLat={userLat} userLng={userLng} onTap={onNearbyTap} />
+          </div>
+        )}
+
+        {/* Report button + footer */}
+        {state !== 'loading' && (
+          <div
+            className="mx-4"
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              paddingTop: 32, paddingBottom: 32, gap: 56,
+            }}
+          >
+            <a href={PGE_REPORT_URL} target="_blank" rel="noopener noreferrer" className="btn-report">
+              Report an outage
+              <img src={externalIcon} alt="" style={{ width: 16, height: 16 }} />
+            </a>
+            <p style={{ fontFamily: 'var(--font)', fontSize: 12, fontWeight: 300, color: 'var(--text-label)', textAlign: 'center' }}>
+              Designed and built (with Claude), Spencer Holtaway 2026
+            </p>
+          </div>
         )}
 
         {lastChecked && state !== 'loading' && (
-          <p className="text-center text-xs" style={{ color: '#ffffff' }}>
+          <p style={{ fontFamily: 'var(--font)', fontSize: 12, color: 'var(--text-subtle)', textAlign: 'center', paddingBottom: 16 }}>
             Last updated {lastChecked.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
           </p>
         )}
       </div>
     </div>
-  )
-}
-
-function LocationButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-label="Use my location"
-      className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 active:opacity-80 transition-opacity"
-      style={{
-        background: '#2F80ED',
-        border: '1px solid #2F80ED',
-        boxShadow: '0 2px 12px 0 rgba(47,128,237,0.20)',
-      }}
-    >
-      <Navigation className="w-5 h-5 text-white" />
-    </button>
   )
 }

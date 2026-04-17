@@ -203,7 +203,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div>
       {screen === 'search' && (
         <SearchScreen onSelect={handleSelect} onLocation={handleLocation} onDebugId={handleDebugId} />
       )}

@@ -1,45 +1,46 @@
 import { useEffect, useState } from 'react'
 import { arcFillPct, remainingMs, formatDuration } from '../utils/time'
+import arcTrackLightSrc from '../assets/arc-track-light.svg'
+import arcTrackDarkSrc  from '../assets/arc-track-dark.svg'
+import arcFillSrc       from '../assets/arc-fill.svg'
 
 interface Props {
   startMs: number | null
-  etaMs: number | null
+  etaMs:   number | null
 }
 
-// Gauge geometry
-const SIZE   = 220
-const STROKE = 20
-const R      = (SIZE - STROKE) / 2   // 100
-const CX     = SIZE / 2              // 110
-const CY     = SIZE / 2              // 110
+/**
+ * Pie-slice clip-path that reveals the fill arc from 9-o'clock (180°)
+ * sweeping clockwise by (pct / 100) × 180°.
+ *
+ * Coordinates are in the fill wrapper's local space:
+ *   width  ≈ 252px  (327 × (1 - 0.2286))
+ *   height = 163.5px (327 × 0.5)
+ * The circle centre is at (163.5, 163.5) — the bottom-centre of the wrapper.
+ */
+function getPieClip(pct: number): string {
+  const cx = 163.5
+  const cy = 163.5
+  const r  = 600   // large enough to reach every corner of the wrapper
+  const sweep = (Math.max(0, Math.min(100, pct)) / 100) * 180
+  const STEPS = 40
 
-const CIRCUMFERENCE   = 2 * Math.PI * R
-const ARC_DEG         = 240
-const ARC_LENGTH      = CIRCUMFERENCE * (ARC_DEG / 360)
-const GAP_LENGTH      = CIRCUMFERENCE - ARC_LENGTH
-const START_ANGLE_DEG = 150
-const END_ANGLE_DEG   = START_ANGLE_DEG + ARC_DEG  // 390 = 30°
-
-const ROTATE = `rotate(${START_ANGLE_DEG}, ${CX}, ${CY})`
-
-// Trim bottom of SVG — labels sit at y≈186 (13px font), so 200px clips the dead space
-const SVG_HEIGHT = 200
-
-function angleToXY(deg: number) {
-  const rad = (deg * Math.PI) / 180
-  return { x: CX + R * Math.cos(rad), y: CY + R * Math.sin(rad) }
+  const pts = [`${cx}px ${cy}px`]
+  for (let i = 0; i <= STEPS; i++) {
+    const rad = ((180 + (i / STEPS) * sweep) * Math.PI) / 180
+    pts.push(`${cx + r * Math.cos(rad)}px ${cy + r * Math.sin(rad)}px`)
+  }
+  return `polygon(${pts.join(', ')})`
 }
 
 function formatTime(ms: number): string {
   return new Date(ms)
     .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-    .replace('\u202f', '')   // narrow no-break space some browsers insert
-    .replace(' ', '')
-    .toLowerCase()
+    .replace('\u202f', '').replace(' ', '').toLowerCase()
 }
 
 export default function ArcWidget({ startMs, etaMs }: Props) {
-  const [, setTick] = useState(0)
+  const [, setTick]   = useState(0)
   const [animated, setAnimated] = useState(false)
 
   useEffect(() => {
@@ -52,84 +53,128 @@ export default function ArcWidget({ startMs, etaMs }: Props) {
     return () => clearTimeout(id)
   }, [])
 
-  const ms  = etaMs ? remainingMs(etaMs) : null
-  const pct = (startMs && etaMs) ? arcFillPct(startMs, etaMs) : 0
-  const fillLen   = animated ? (pct / 100) * ARC_LENGTH : 0
+  const ms      = etaMs ? remainingMs(etaMs) : null
+  const pct     = (startMs && etaMs) ? arcFillPct(startMs, etaMs) : 0
+  const animPct = animated ? pct : 0
 
-  const isOverdue = etaMs !== null && (etaMs <= Date.now())
-  const arcColor  = isOverdue ? '#EB5757' : pct >= 67 ? '#219653' : pct >= 34 ? '#F2994A' : '#EB5757'
+  // All layers sit in the same grid cell (col 1, row 1) — matches Figma's
+  // inline-grid / grid-cols-[max-content] / grid-rows-[max-content] pattern.
+  const layer: React.CSSProperties = { gridColumn: 1, gridRow: 1 }
 
-  const trackDash = `${ARC_LENGTH} ${GAP_LENGTH}`
-  const fillDash  = `${fillLen} ${CIRCUMFERENCE - fillLen}`
-
-  // Dot at end of fill — always positioned at arc start, rotated via CSS to match fill
-  const dot = angleToXY(START_ANGLE_DEG)
-
-  // Arc endpoint positions for timestamp labels
-  const startPt = angleToXY(START_ANGLE_DEG)
-  const endPt   = angleToXY(END_ANGLE_DEG)
-  const labelY  = startPt.y + STROKE / 2 + 16
+  const labelStyle: React.CSSProperties = {
+    fontFamily: 'var(--font)',
+    fontSize: 16,
+    fontWeight: 300,
+    color: 'var(--text-label)',
+    lineHeight: 'normal',
+    margin: 0,
+  }
 
   return (
-    <div className="relative" style={{ width: SIZE, height: SVG_HEIGHT }}>
-        <svg width={SIZE} height={SVG_HEIGHT} viewBox={`0 0 ${SIZE} ${SVG_HEIGHT}`}>
-          {/* Track */}
-          <circle
-            cx={CX} cy={CY} r={R}
-            fill="none" stroke="#E5E7EB" strokeWidth={STROKE}
-            strokeLinecap="round" strokeDasharray={trackDash}
-            transform={ROTATE}
-          />
-          {/* Fill */}
-          <circle
-            cx={CX} cy={CY} r={R}
-            fill="none" stroke={arcColor} strokeWidth={STROKE}
-            strokeLinecap="round" strokeDasharray={fillDash}
-            transform={ROTATE}
-            style={{ transition: 'stroke-dasharray 1s ease-out' }}
-          />
-          {/* Dot marker — rotates with the fill animation */}
-          {(startMs && etaMs) && (
-            <circle
-              cx={dot.x} cy={dot.y} r={STROKE / 2} fill={arcColor}
-              style={{
-                transformOrigin: `${CX}px ${CY}px`,
-                transform: `rotate(${animated ? (pct / 100) * ARC_DEG : 0}deg)`,
-                transition: 'transform 1s ease-out',
-              }}
-            />
-          )}
-          {/* Start time — anchored under left arc end */}
-          {startMs && (
-            <text
-              x={startPt.x} y={labelY}
-              textAnchor="middle"
-              fill="#9CA3AF" fontSize="13"
-              fontFamily="Instrument Sans, system-ui, sans-serif"
-            >
-              {formatTime(startMs)}
-            </text>
-          )}
-          {/* ETA time — anchored under right arc end */}
-          {etaMs && (
-            <text
-              x={endPt.x} y={labelY}
-              textAnchor="middle"
-              fill="#9CA3AF" fontSize="13"
-              fontFamily="Instrument Sans, system-ui, sans-serif"
-            >
-              {formatTime(etaMs)}
-            </text>
-          )}
-        </svg>
+    <div style={{
+      display: 'inline-grid',
+      gridTemplateColumns: 'max-content',
+      gridTemplateRows: 'max-content',
+      alignItems: 'start',
+      justifyItems: 'start',
+    }}>
 
-        {/* Centre text */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center pb-4" style={{ height: SIZE }}>
-          <span className="text-sm text-gray-400 leading-snug text-center">Expected<br />Restoration</span>
-          <span className="text-3xl font-bold text-gray-800 leading-none mt-1">
-            {etaMs ? formatDuration(ms ?? 0) : 'Unknown'}
-          </span>
+      {/* ── Layer 1: Track ─────────────────────────────────────────────── */}
+      {/* Light mode */}
+      <div
+        className="dark:hidden"
+        style={{ ...layer, marginLeft: 22.7, position: 'relative', width: 327, height: 327 }}
+      >
+        <div style={{ position: 'absolute', top: '-6.12%', right: '-6.1%', bottom: '43.88%', left: '-6.1%' }}>
+          <img
+            src={arcTrackLightSrc}
+            aria-hidden="true"
+            style={{ display: 'block', width: '100%', height: '100%', maxWidth: 'none' }}
+          />
         </div>
+      </div>
+
+      {/* Dark mode */}
+      <div
+        className="hidden dark:block"
+        style={{ ...layer, marginLeft: 22.7, position: 'relative', width: 327, height: 327 }}
+      >
+        <div style={{ position: 'absolute', top: '-14.68%', right: '-17.11%', bottom: '30.43%', left: '-17.11%' }}>
+          <img
+            src={arcTrackDarkSrc}
+            aria-hidden="true"
+            style={{ display: 'block', width: '100%', height: '100%', maxWidth: 'none' }}
+          />
+        </div>
+      </div>
+
+      {/* ── Layer 2: Fill arc ──────────────────────────────────────────── */}
+      <div style={{ ...layer, marginLeft: 22.7, position: 'relative', width: 327, height: 327 }}>
+        {/* clip-path sits on the wrapper div so the img inside fills it naturally */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: '22.86%',
+            bottom: '50%',
+            clipPath: getPieClip(animPct),
+            transition: 'clip-path 1s ease-out',
+          }}
+        >
+          <img
+            src={arcFillSrc}
+            aria-hidden="true"
+            style={{ display: 'block', width: '100%', height: '100%', maxWidth: 'none' }}
+          />
+        </div>
+      </div>
+
+      {/* ── Layer 3: Time labels ───────────────────────────────────────── */}
+      {/* Uses a nested stacking grid so ml values are relative to the outer
+          grid origin — exactly as Figma specifies (ml-0 / ml-271.4). */}
+      <div style={{
+        ...layer,
+        marginTop: 172,
+        display: 'inline-grid',
+        gridTemplateColumns: 'max-content',
+        gridTemplateRows: 'max-content',
+        alignItems: 'start',
+        justifyItems: 'start',
+      }}>
+        {/* End-time — right-aligned at ml-271.4 */}
+        {etaMs && (
+          <p style={{ ...labelStyle, gridColumn: 1, gridRow: 1, marginLeft: 271.4, width: 100, textAlign: 'right' }}>
+            {formatTime(etaMs)}
+          </p>
+        )}
+        {/* Start-time — left edge at ml-0 */}
+        {startMs && (
+          <p style={{ ...labelStyle, gridColumn: 1, gridRow: 1, marginLeft: 0, width: 100 }}>
+            {formatTime(startMs)}
+          </p>
+        )}
+      </div>
+
+      {/* ── Layer 4: Centre text ───────────────────────────────────────── */}
+      <div style={{
+        ...layer,
+        marginLeft: 63.7,
+        marginTop: 65,
+        width: 244,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        textAlign: 'center',
+      }}>
+        <p style={{ fontFamily: 'var(--font)', fontSize: 16, fontWeight: 300, color: '#0089C4', lineHeight: 'normal', margin: 0, width: '100%' }}>
+          Estimated fix
+        </p>
+        <p style={{ fontFamily: 'var(--font)', fontSize: 44, fontWeight: 300, color: '#0089C4', lineHeight: 'normal', margin: 0, width: '100%' }}>
+          {etaMs ? formatDuration(ms ?? 0) : 'Unknown'}
+        </p>
+      </div>
+
     </div>
   )
 }
