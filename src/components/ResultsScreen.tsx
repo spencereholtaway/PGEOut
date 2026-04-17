@@ -69,7 +69,6 @@ export default function ResultsScreen({
           <span style={{ fontFamily: 'var(--font)', fontSize: 24, fontWeight: 400, color: 'var(--text-muted)', lineHeight: 'normal', flex: 1 }}>
             Outages affecting
           </span>
-          <img src={menuIcon} alt="Menu" style={{ width: 24, height: 24, flexShrink: 0 }} />
         </div>
 
         {/* Address pill — tappable */}
