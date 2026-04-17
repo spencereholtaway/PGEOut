@@ -39,8 +39,8 @@ export default function SearchScreen({ onSelect, onLocation, onDebugId }: Props)
   return (
     <div className="app-bg min-h-screen flex flex-col">
 
-      {/* Rectangle 2 — sticky gradient fade */}
-      <div className="sticky-gradient" />
+      {/* Rectangle 2 — only on empty state, not when suggestions are showing */}
+      {!showSuggestions && <div className="sticky-gradient" />}
 
       {/* Sticky header — spec 70:189: h-[158px] flex-col gap-[16px] justify-end px-[16px] */}
       <div
