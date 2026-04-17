@@ -34,28 +34,41 @@ html, body, #root {
 }
 
 html {
-  background: var(--bg-from);  /* light blue — matches safe-area gaps top/bottom */
+  background: var(--bg-from); /* safe-area gap colour fallback */
+}
+
+/* Fixed viewport gradient — always covers the full screen on every page,
+   regardless of content height. Sits behind everything via z-index: -1.    */
+html::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, var(--bg-from) 0%, var(--bg-to) 100%);
+  z-index: -1;
+  pointer-events: none;
 }
 
 body {
   padding-bottom: env(safe-area-inset-bottom);
-  background: var(--bg-from);
+  background: transparent;
 }
 
 /* ─── App background ─────────────────────────────────────────────────────── */
 .app-bg {
-  min-height: 100%;
-  background: linear-gradient(180deg, var(--bg-from) 0%, var(--bg-to) 100%);
+  min-height: 100dvh;
+  background: transparent; /* gradient comes from html::before */
   position: relative;
 }
 
+/* Blue tint overlay — keeps the top-of-screen blue cast */
 .app-bg::before {
   content: '';
-  position: absolute;
+  position: fixed;
   top: 0; left: 0; right: 0;
-  height: 85%;
+  height: 60%;
   background: linear-gradient(180deg, rgba(0,137,196,0.12) 0%, rgba(0,137,196,0) 100%);
   pointer-events: none;
+  z-index: -1;
 }
 
 /* ─── Rectangle 2 — spec 59:170 ─────────────────────────────────────────── */
@@ -64,8 +77,8 @@ body {
 .sticky-gradient {
   position: sticky;
   top: 0;
-  height: 290px;
-  margin-bottom: -290px;
+  height: 220px;
+  margin-bottom: -220px;
   pointer-events: none;
   z-index: 9;
   background: linear-gradient(180deg, #E6F3F9 72.014%, rgba(230,243,249,0) 100%);
@@ -135,14 +148,17 @@ body {
   }
 
   html  { background: var(--dark-bg-from); }
-  body  { background: var(--dark-bg-from); }
+  body  { background: transparent; }
 
-  .app-bg {
+  html::before {
     background: linear-gradient(180deg, var(--dark-bg-from) 0%, var(--dark-bg-to) 100%);
   }
+
   .app-bg::before { display: none; }
 
   .sticky-gradient {
+    height: 220px;
+    margin-bottom: -220px;
     background: linear-gradient(180deg, #000000 70.5%, rgba(0,0,0,0) 100%);
   }
 
