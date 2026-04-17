@@ -8,7 +8,7 @@ interface Props {
   triggerAnimation?: boolean
 }
 
-const SIZE   = 36
+const SIZE   = 32
 const STROKE = 5
 const R      = (SIZE - STROKE) / 2
 const CX     = SIZE / 2

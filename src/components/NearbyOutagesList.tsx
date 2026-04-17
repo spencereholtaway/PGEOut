@@ -52,21 +52,23 @@ function OutageRow({
       }}
       onClick={() => onTap(outage)}
     >
-      {/* Left: pin icon + distance */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+      {/* Left: pin icon + distance — flex-1 to fill space */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 0 0', minWidth: 0 }}>
         <picture style={{ width: 16, height: 16, flexShrink: 0, display: 'block' }}>
           <source srcSet={pinIconDark}  media="(prefers-color-scheme: dark)" />
           <img src={pinIconLight} alt="" style={{ width: 16, height: 16, display: 'block' }} />
         </picture>
-        <span style={{ fontFamily: 'var(--font)', fontSize: 16, fontWeight: 400, color: 'var(--text-content)', whiteSpace: 'nowrap' }}>
+        <span style={{ fontFamily: 'var(--font)', fontSize: 16, fontWeight: 400, color: 'var(--text-content)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {distLabel ?? '\u2014'}
         </span>
       </div>
 
-      {/* Centre: badge */}
-      <span className={`badge ${isPlanned ? 'badge-planned' : 'badge-unplanned'}`}>
-        {isPlanned ? 'Planned' : 'Unplanned'}
-      </span>
+      {/* Centre: badge in fixed-width container — spec w-[75px] */}
+      <div style={{ width: 75, flexShrink: 0 }}>
+        <span className={`badge ${isPlanned ? 'badge-planned' : 'badge-unplanned'}`}>
+          {isPlanned ? 'Planned' : 'Unplanned'}
+        </span>
+      </div>
 
       {/* Right: time + mini arc */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
