@@ -67,7 +67,7 @@ export default function SearchScreen({ onSelect, onLocation, onDebugId }: Props)
         {/* Address input pill — spec 70:197 */}
         <div
           className="address-pill w-full"
-          style={{ display: 'flex', alignItems: 'center', padding: '16px 20px 16px 16px' }}
+          style={{ display: 'flex', alignItems: 'center', padding: '16px 20px 16px 16px', borderRadius: 1000 }}
         >
           <input
             type="text"
