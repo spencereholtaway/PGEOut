@@ -34,7 +34,7 @@ html, body, #root {
 }
 
 html {
-  background: var(--bg-to);   /* white — matches gradient end, no gray flash */
+  background: var(--bg-from);  /* light blue — matches safe-area gaps top/bottom */
 }
 
 body {

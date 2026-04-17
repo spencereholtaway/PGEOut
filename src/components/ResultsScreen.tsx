@@ -53,12 +53,14 @@ export default function ResultsScreen({
       <div
         className="sticky top-0 z-10"
         style={{
-          height: 'calc(222px + env(safe-area-inset-top))',
+          height: '222px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'flex-end',
           gap: 16,
-          padding: '0 16px',
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingLeft: 16,
+          paddingRight: 16,
         }}
       >
         {/* "Outages affecting" label row */}
