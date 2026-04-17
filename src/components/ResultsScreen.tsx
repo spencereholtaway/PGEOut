@@ -1,5 +1,4 @@
 import pgeLogo    from '../assets/pge-logo.png'
-import menuIcon   from '../assets/icon-menu.svg'
 import pencilIcon from '../assets/icon-pencil.svg'
 import externalIcon from '../assets/icon-external.svg'
 import OutageCard from './OutageCard'
