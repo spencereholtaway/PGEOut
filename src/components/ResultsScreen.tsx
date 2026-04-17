@@ -52,12 +52,12 @@ export default function ResultsScreen({
       <div
         className="sticky top-0 z-10"
         style={{
-          height: '222px',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'flex-end',
+          justifyContent: 'flex-start',
           gap: 16,
-          paddingTop: 'env(safe-area-inset-top)',
+          paddingTop: 'calc(env(safe-area-inset-top) + 16px)',
+          paddingBottom: 16,
           paddingLeft: 16,
           paddingRight: 16,
         }}
