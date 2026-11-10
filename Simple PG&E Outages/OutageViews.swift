@@ -197,6 +197,9 @@ struct NearbyOutageRow: View {
                 }
                 Gauge(value: outage.progress(at: context.date)) {
                     Text("Restore progress")
+                } currentValueLabel: {
+                    Image(systemName: outage.isPlanned ? "wrench.fill" : "bolt.fill")
+                        .foregroundStyle(outage.tint)
                 }
                 .gaugeStyle(.accessoryCircularCapacity)
                 .tint(outage.tint)

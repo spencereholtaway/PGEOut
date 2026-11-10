@@ -8,7 +8,6 @@ struct ContentView: View {
     @State private var isLocating = false
     @State private var errorMessage: String?
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let reportURL = URL(string: "https://www.pge.com/en/contact-us/report-an-issue/report-electric-issue.html")!
@@ -29,7 +28,7 @@ struct ContentView: View {
                 .searchSuggestions { suggestions }
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
-                        Button("Use My Location", systemImage: "location", action: useCurrentLocation)
+                        Button("Use My Location", systemImage: "location.fill", action: useCurrentLocation)
                             .disabled(isLocating)
                     }
                 }
@@ -64,18 +63,6 @@ struct ContentView: View {
     private var content: some View {
         if store.location == nil && store.status == .idle {
             welcome
-        } else if horizontalSizeClass == .regular {
-            // Wide layouts, such as the iPhone Duo inner display, keep the
-            // outage status and the nearby list on either side of the fold.
-            ArrangementView {
-                List { statusSection }
-            } secondary: {
-                List {
-                    nearbySection
-                    reportSection
-                }
-            }
-            .arrangementViewStyle(.split.axes(.horizontal))
         } else {
             List {
                 statusSection

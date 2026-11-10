@@ -25,6 +25,8 @@ final class OutageStore {
     @ObservationIgnored private var knownIDs: Set<Int> = []
     /// True while showing a single outage looked up by ID, which pauses auto-refresh.
     @ObservationIgnored private var isDebugLookup = false
+    /// True for preview stores, which show sample data instead of fetching.
+    @ObservationIgnored private var isPreview = false
 
     private static let storageKey = "savedLocation"
     static let refreshInterval: Duration = .seconds(15 * 60)
@@ -51,7 +53,7 @@ final class OutageStore {
 
     /// Reloads outages for the current location.
     func load() async {
-        guard let location, !isDebugLookup else { return }
+        guard let location, !isDebugLookup, !isPreview else { return }
         guard location.isInServiceTerritory else {
             outages = []
             nearby = []
@@ -79,6 +81,7 @@ final class OutageStore {
 
     /// Reloads only if the set of outages has changed since the last check.
     func refreshIfChanged() async {
+        guard !isPreview else { return }
         guard let ids = try? await service.fetchIDs() else { return }
         if ids != knownIDs {
             knownIDs = ids
@@ -118,6 +121,7 @@ extension OutageStore {
             state: "CA", county: "San Francisco"
         )
         let store = OutageStore(location: home)
+        store.isPreview = true
         store.status = status
         store.lastChecked = .now
         if status == .outages {
