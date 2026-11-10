@@ -37,34 +37,33 @@ struct OutageKindBadge: View {
     }
 }
 
+// MARK: - Clock
+
+extension EnvironmentValues {
+    /// The time countdowns are drawn for. `ContentView` advances it on each minute from one
+    /// shared timeline, since labels only show minutes.
+    @Entry var now: Date = .now
+}
+
 // MARK: - Restore gauge
 
 /// A semicircular gauge that fills from the outage's start time to its estimated restore time.
 struct RestoreGauge: View {
     let outage: Outage
 
-    var body: some View {
-        // Re-evaluate every 30 seconds so the remaining time stays current.
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            RestoreGaugeContent(outage: outage, now: context.date)
-        }
-    }
-}
-
-private struct RestoreGaugeContent: View {
-    let outage: Outage
-    let now: Date
-
     @State private var displayedProgress = 0.0
+    @Environment(\.now) private var now
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let progress = outage.progress(at: now)
+        let remaining = outage.remainingText(at: now)
         Gauge(value: displayedProgress) {
             Text("Estimated fix")
         } currentValueLabel: {
-            Text(outage.remainingText(at: now) ?? String(localized: "Unknown"))
+            Text(remaining ?? String(localized: "Unknown"))
                 .contentTransition(.numericText())
+                .animation(reduceMotion ? nil : .default, value: remaining)
         } minimumValueLabel: {
             if let start = outage.start {
                 Text(start, format: timeFormat(for: start))
@@ -75,17 +74,20 @@ private struct RestoreGaugeContent: View {
             }
         }
         .gaugeStyle(RestoreArcGaugeStyle(tint: outage.tint))
-        .animation(reduceMotion ? nil : .default, value: outage.remainingText(at: now))
-        .onAppear { setProgress(progress) }
-        .onChange(of: progress) { _, newValue in setProgress(newValue) }
+        .onAppear { setProgress(progress, animated: true) }
+        .onChange(of: progress) { oldValue, newValue in
+            // Each minute the arc moves a hair, too little to see, so skip a second-long animation
+            // for it. Visible moves, like a new estimate, still sweep.
+            setProgress(newValue, animated: abs(newValue - oldValue) > 0.02)
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Estimated fix")
-        .accessibilityValue(outage.remainingText(at: now).map { String(localized: "\($0) remaining") } ?? String(localized: "Unknown"))
+        .accessibilityValue(remaining.map { String(localized: "\($0) remaining") } ?? String(localized: "Unknown"))
     }
 
     /// Sweeps the arc to its value, or jumps there when Reduce Motion is on.
-    private func setProgress(_ value: Double) {
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 1)) {
+    private func setProgress(_ value: Double, animated: Bool) {
+        withAnimation(animated && !reduceMotion ? .easeOut(duration: 1) : nil) {
             displayedProgress = value
         }
     }
@@ -180,33 +182,33 @@ struct NearbyOutageRow: View {
     let outage: Outage
     let origin: CLLocationCoordinate2D?
 
+    @Environment(\.now) private var now
+
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Label(outage.distanceText(from: origin) ?? "—", systemImage: "mappin.and.ellipse")
-                    OutageKindBadge(isPlanned: outage.isPlanned)
-                }
-                Spacer()
-                if let remaining = outage.remainingText(at: context.date) {
-                    Text(remaining)
-                        .font(.subheadline)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .contentTransition(.numericText())
-                }
-                Gauge(value: outage.progress(at: context.date)) {
-                    Text("Restore progress")
-                } currentValueLabel: {
-                    Image(systemName: outage.isPlanned ? "wrench.fill" : "bolt.fill")
-                        .foregroundStyle(outage.tint)
-                }
-                .gaugeStyle(.accessoryCircularCapacity)
-                .tint(outage.tint)
-                .scaleEffect(0.6)
-                .frame(width: 36, height: 36)
-                .accessibilityHidden(true)
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Label(outage.distanceText(from: origin) ?? "—", systemImage: "mappin.and.ellipse")
+                OutageKindBadge(isPlanned: outage.isPlanned)
             }
+            Spacer()
+            if let remaining = outage.remainingText(at: now) {
+                Text(remaining)
+                    .font(.subheadline)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
+            }
+            Gauge(value: outage.progress(at: now)) {
+                Text("Restore progress")
+            } currentValueLabel: {
+                Image(systemName: outage.isPlanned ? "wrench.fill" : "bolt.fill")
+                    .foregroundStyle(outage.tint)
+            }
+            .gaugeStyle(.accessoryCircularCapacity)
+            .tint(outage.tint)
+            .scaleEffect(0.6)
+            .frame(width: 36, height: 36)
+            .accessibilityHidden(true)
         }
     }
 }

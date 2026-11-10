@@ -23,6 +23,8 @@ final class OutageStore {
 
     @ObservationIgnored private let service = OutageService()
     @ObservationIgnored private var knownIDs: Set<Int> = []
+    /// When data was last requested, whether or not it arrived. Limits how often refreshes run.
+    @ObservationIgnored private var lastAttempt: ContinuousClock.Instant?
     /// True while showing a single outage looked up by ID, which pauses auto-refresh.
     @ObservationIgnored private var isDebugLookup = false
     /// True for preview stores, which show sample data instead of fetching.
@@ -48,6 +50,8 @@ final class OutageStore {
         }
         outages = []
         nearby = []
+        knownIDs = []
+        status = .loading
         await load()
     }
 
@@ -60,34 +64,67 @@ final class OutageStore {
             status = .outsideTerritory
             return
         }
-        if outages.isEmpty && nearby.isEmpty { status = .loading }
+        let showingResults = status == .outages || status == .none
+        if !showingResults { status = .loading }
+        lastAttempt = ContinuousClock.now
 
         let coordinate = location.coordinate
+        let service = self.service
+        // Send every request at once so the radio wakes once and can go back to sleep sooner.
+        async let coveringRequest = service.outages(containing: coordinate)
+        async let nearbyRequest = service.outages(near: coordinate)
+        async let idsRequest = service.fetchIDs(near: coordinate)
         do {
-            let covering = try await service.outages(containing: coordinate)
+            let covering = try await coveringRequest
             outages = sortedByDistance(covering, from: coordinate)
             status = covering.isEmpty ? .none : .outages
+            lastChecked = .now
 
             // Nearby outages are a bonus, so a failure here doesn't fail the screen.
             let coveringIDs = Set(covering.map(\.id))
-            if let around = try? await service.outages(near: coordinate) {
+            if let around = try? await nearbyRequest {
                 nearby = Array(sortedByDistance(around.filter { !coveringIDs.contains($0.id) }, from: coordinate).prefix(3))
             }
+            // Remember what was loaded so the periodic check can skip a reload when nothing changed.
+            if let ids = try? await idsRequest {
+                knownIDs = ids
+            }
         } catch {
-            status = .failed
+            if Task.isCancelled {
+                // The app left the foreground mid-request. Let the next foreground refresh try again.
+                lastAttempt = nil
+            } else if !showingResults {
+                // Earlier results stay on screen if there are any. Either way, the next try is the
+                // next scheduled check or a manual refresh, never an immediate retry.
+                status = .failed
+            }
         }
-        lastChecked = .now
     }
 
-    /// Reloads only if the set of outages has changed since the last check.
+    /// Reloads only if the set of nearby outages has changed since the last load.
     func refreshIfChanged() async {
-        guard !isPreview else { return }
-        guard let ids = try? await service.fetchIDs() else { return }
-        if ids != knownIDs {
-            knownIDs = ids
+        guard let location, location.isInServiceTerritory, !isDebugLookup, !isPreview else { return }
+        lastAttempt = ContinuousClock.now
+        do {
+            let ids = try await service.fetchIDs(near: location.coordinate)
+            if ids != knownIDs {
+                await load()
+            } else {
+                lastChecked = .now
+            }
+        } catch {
+            if Task.isCancelled { lastAttempt = nil }
+        }
+    }
+
+    /// Brings data up to date when the app returns to the foreground, unless it was checked recently.
+    func refreshIfStale() async {
+        if let lastAttempt, lastAttempt.duration(to: ContinuousClock.now) < Self.refreshInterval { return }
+        if status == .outages || status == .none {
+            await refreshIfChanged()
+        } else {
             await load()
         }
-        lastChecked = .now
     }
 
     /// Debug shortcut: show a single outage by incident ID.

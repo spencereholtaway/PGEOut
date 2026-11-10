@@ -6,10 +6,21 @@ struct OutageService {
     private static let base = URL(string: "https://services.arcgis.com/BLN4oKB0N1YSgvY8/arcgis/rest/services/Power_Outages_(View)/FeatureServer/1/query")!
     private static let fields = "IncidentId,OutageType,Cause,ImpactedCustomers,County,StartDate,EstimatedRestoreDate"
 
-    /// Object IDs of every current outage, used to cheaply detect changes.
-    func fetchIDs() async throws -> Set<Int> {
-        let response: IDResponse = try await get([
-            URLQueryItem(name: "where", value: "1=1"),
+    /// Bounds each request so a weak signal can't keep the radio awake for long. There are no
+    /// automatic retries: a failed request waits for the next scheduled check or a manual refresh.
+    private static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForResource = 30
+        // Fail right away when offline rather than waiting for a connection.
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
+    }()
+
+    /// Object IDs of the outages within `miles` of the coordinate, used to cheaply detect changes.
+    /// Scoped to the same area as `outages(near:)`, so outages elsewhere in the state don't trigger a reload.
+    func fetchIDs(near coordinate: CLLocationCoordinate2D, miles: Int = 50) async throws -> Set<Int> {
+        let response: IDResponse = try await get(nearbyQuery(coordinate, miles: miles) + [
             URLQueryItem(name: "returnIdsOnly", value: "true"),
         ])
         return Set(response.objectIds ?? [])
@@ -22,10 +33,7 @@ struct OutageService {
 
     /// Outages within `miles` of the coordinate.
     func outages(near coordinate: CLLocationCoordinate2D, miles: Int = 50) async throws -> [Outage] {
-        try await features(pointQuery(coordinate) + [
-            URLQueryItem(name: "distance", value: String(miles)),
-            URLQueryItem(name: "units", value: "esriSRUnit_StatuteMile"),
-        ])
+        try await features(nearbyQuery(coordinate, miles: miles))
     }
 
     /// A single outage by its incident ID. Used by the debug search shortcut.
@@ -42,6 +50,13 @@ struct OutageService {
             URLQueryItem(name: "geometryType", value: "esriGeometryPoint"),
             URLQueryItem(name: "spatialRel", value: "esriSpatialRelIntersects"),
             URLQueryItem(name: "inSR", value: "4326"),
+        ]
+    }
+
+    private func nearbyQuery(_ coordinate: CLLocationCoordinate2D, miles: Int) -> [URLQueryItem] {
+        pointQuery(coordinate) + [
+            URLQueryItem(name: "distance", value: String(miles)),
+            URLQueryItem(name: "units", value: "esriSRUnit_StatuteMile"),
         ]
     }
 
@@ -72,7 +87,7 @@ struct OutageService {
 
     private func get<T: Decodable>(_ query: [URLQueryItem]) async throws -> T {
         let url = Self.base.appending(queryItems: query + [URLQueryItem(name: "f", value: "json")])
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await Self.session.data(from: url)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
         }

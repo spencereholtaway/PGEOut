@@ -45,11 +45,13 @@ enum Places {
     enum LocationError: LocalizedError {
         case denied
         case notFound
+        case unavailable
 
         var errorDescription: String? {
             switch self {
             case .denied: String(localized: "Location access is off. Allow it in Settings, or search for an address instead.")
             case .notFound: String(localized: "That address couldn’t be found.")
+            case .unavailable: String(localized: "Your location couldn’t be found right now. Try again, or search for an address instead.")
             }
         }
     }
@@ -63,20 +65,7 @@ enum Places {
 
     /// Finds the device's location once, then reverse geocodes it.
     static func currentLocation() async throws -> SavedLocation {
-        let session = CLServiceSession(authorization: .whenInUse)
-        defer { session.invalidate() }
-
-        var found: CLLocation?
-        for try await update in CLLocationUpdate.liveUpdates() {
-            if let location = update.location {
-                found = location
-                break
-            }
-            if update.authorizationDenied || update.authorizationDeniedGlobally || update.authorizationRestricted {
-                throw LocationError.denied
-            }
-        }
-        guard let found else { throw LocationError.notFound }
+        let found = try await locationFix()
 
         guard let request = MKReverseGeocodingRequest(location: found),
               let item = try await request.mapItems.first else {
@@ -92,6 +81,61 @@ enum Places {
         saved.latitude = found.coordinate.latitude
         saved.longitude = found.coordinate.longitude
         return saved
+    }
+
+    /// A fix this accurate is plenty to find the outage polygon covering it.
+    private static let acceptableAccuracy: CLLocationAccuracy = 100
+
+    /// Gets one location fix, keeping location hardware on no longer than needed:
+    /// it takes the first recent fix within 100 m, settles for the latest fix after 10 seconds
+    /// of searching, and gives up entirely after 30 seconds in case no fix arrives at all.
+    private static func locationFix() async throws -> CLLocation {
+        let session = CLServiceSession(authorization: .whenInUse)
+        defer { session.invalidate() }
+
+        let fix = try await withThrowingTaskGroup(of: CLLocation?.self, returning: CLLocation?.self) { group in
+            group.addTask { try await Places.followUpdates(settlingAfter: .seconds(10)) }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(30))
+                return nil
+            }
+            defer { group.cancelAll() }
+            for try await result in group {
+                if let result { return result }
+                // Time's up: cancelling stops location updates and returns the latest fix, if any.
+                group.cancelAll()
+            }
+            return nil
+        }
+        guard let fix else { throw LocationError.unavailable }
+        return fix
+    }
+
+    /// Follows location updates until one is good enough, then returns, which stops the updates.
+    private static func followUpdates(settlingAfter settleTime: Duration) async throws -> CLLocation? {
+        var latest: CLLocation?
+        var searchStart: ContinuousClock.Instant?
+        for try await update in CLLocationUpdate.liveUpdates() {
+            if update.authorizationDenied || update.authorizationDeniedGlobally || update.authorizationRestricted {
+                throw LocationError.denied
+            }
+            // Location hardware stays off while the permission prompt is up, so start the settle clock after it.
+            if update.authorizationRequestInProgress { continue }
+            if searchStart == nil { searchStart = ContinuousClock.now }
+
+            if let location = update.location, location.horizontalAccuracy >= 0 {
+                latest = location
+                if location.horizontalAccuracy <= acceptableAccuracy && location.timestamp.timeIntervalSinceNow > -60 {
+                    return location
+                }
+            }
+            // Accuracy won't improve while the device sits still, and a rough fix beats searching longer.
+            if let latest, let searchStart, update.stationary || searchStart.duration(to: ContinuousClock.now) >= settleTime {
+                return latest
+            }
+        }
+        // Updates end when the task is cancelled by the timeout.
+        return latest
     }
 
     private static func savedLocation(from item: MKMapItem, title: String) -> SavedLocation {

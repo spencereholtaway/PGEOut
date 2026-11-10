@@ -7,8 +7,10 @@ struct ContentView: View {
     @State private var isSearching = false
     @State private var isLocating = false
     @State private var errorMessage: String?
+    @State private var isLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     private static let reportURL = URL(string: "https://www.pge.com/en/contact-us/report-an-issue/report-electric-issue.html")!
 
@@ -17,44 +19,69 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            content
-                .navigationTitle("Outages")
-                .navigationSubtitle(addressLine)
-                .navigationDestination(for: Outage.self) { outage in
-                    OutageDetailView(outage: outage, origin: store.location?.coordinate)
-                }
-                .searchable(text: $completer.query, isPresented: $isSearching, prompt: "Search for an address")
-                .searchSuggestions { suggestions }
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button("Use My Location", systemImage: "location.fill", action: useCurrentLocation)
-                            .disabled(isLocating)
+        // One shared clock for every countdown. Labels only show minutes, so it ticks on the minute,
+        // and the system pauses it while the app isn't on screen.
+        TimelineView(.everyMinute) { context in
+            NavigationStack {
+                content
+                    .navigationTitle("Outages")
+                    .navigationSubtitle(addressLine)
+                    .navigationDestination(for: Outage.self) { outage in
+                        OutageDetailView(outage: outage, origin: store.location?.coordinate)
                     }
-                }
-                .refreshable { await store.load() }
-                .alert("Couldn’t Find Location", isPresented: .constant(errorMessage != nil)) {
-                    Button("OK") { errorMessage = nil }
-                } message: {
-                    Text(errorMessage ?? "")
-                }
+                    .searchable(text: $completer.query, isPresented: $isSearching, prompt: "Search for an address")
+                    .searchSuggestions { suggestions }
+                    .toolbar {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button("Use My Location", systemImage: "location.fill", action: useCurrentLocation)
+                                .disabled(isLocating)
+                        }
+                    }
+                    .refreshable { await store.load() }
+                    .alert("Couldn’t Find Location", isPresented: .constant(errorMessage != nil)) {
+                        Button("OK") { errorMessage = nil }
+                    } message: {
+                        Text(errorMessage ?? "")
+                    }
+            }
+            .environment(\.now, context.date)
         }
         .animation(reduceMotion ? nil : .default, value: store.status)
         .animation(reduceMotion ? nil : .default, value: store.nearby)
         .task {
             if store.location == nil {
                 isSearching = true
-            } else {
-                await store.load()
             }
         }
-        .task {
-            // Check for new outage data every 15 minutes while the app is open.
-            while !Task.isCancelled {
-                try? await Task.sleep(for: OutageStore.refreshInterval)
+        // Runs while the app is in the foreground and is cancelled when it leaves, so nothing polls
+        // in the background. Restarts when Low Power Mode changes.
+        .task(id: AutoRefresh(isForeground: scenePhase != .background, isLowPowerMode: isLowPowerMode)) {
+            guard scenePhase != .background else { return }
+            // Loads on launch, and on return only if the data is older than the refresh interval.
+            await store.refreshIfStale()
+            // In Low Power Mode, refresh only on return to the app or with pull to refresh.
+            // Read the setting directly in case it changed while the app was suspended.
+            guard !ProcessInfo.processInfo.isLowPowerModeEnabled else { return }
+            while true {
+                do {
+                    // The tolerance lets the system wake for this together with other work.
+                    try await Task.sleep(for: OutageStore.refreshInterval, tolerance: .seconds(60))
+                } catch {
+                    return
+                }
                 await store.refreshIfChanged()
             }
         }
+        .task {
+            for await _ in NotificationCenter.default.notifications(named: .NSProcessInfoPowerStateDidChange) {
+                isLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
+            }
+        }
+    }
+
+    private struct AutoRefresh: Equatable {
+        var isForeground: Bool
+        var isLowPowerMode: Bool
     }
 
     // MARK: - Layout
