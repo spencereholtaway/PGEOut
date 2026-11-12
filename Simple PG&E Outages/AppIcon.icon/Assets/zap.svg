@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <g transform="translate(512 512) scale(0.9) translate(-512 -512)">
+  <!-- White outline sits entirely outside the zap: a wider rounded silhouette behind it. -->
+  <path d="M 612 140 L 318 572 L 500 572 L 412 884 L 706 452 L 524 452 Z"
+        fill="#FFFFFF" stroke="#FFFFFF" stroke-width="88" stroke-linejoin="round"/>
+  <!-- The orange zap on top, with a thin same-color stroke to soften its corners. -->
+  <path d="M 612 140 L 318 572 L 500 572 L 412 884 L 706 452 L 524 452 Z"
+        fill="#FFA100" stroke="#FFA100" stroke-width="16" stroke-linejoin="round"/>
+  </g>
+</svg>
