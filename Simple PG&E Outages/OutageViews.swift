@@ -14,9 +14,22 @@ extension Outage {
             .formatted(.units(allowed: [.days, .hours, .minutes], width: .narrow, maximumUnitCount: 2))
     }
 
+    /// Distance to the outage, such as "0.3 mi", "4.1 mi" or "14 mi". Feet are only used under
+    /// 0.1 mi, where tenths of a mile stop being meaningful. Metric locales keep the system's road units.
     func distanceText(from coordinate: CLLocationCoordinate2D?) -> String? {
         guard let coordinate, let distance = distance(from: coordinate) else { return nil }
-        return distance.formatted(.measurement(width: .abbreviated, usage: .road))
+        guard Locale.current.measurementSystem != .metric else {
+            return distance.formatted(.measurement(width: .abbreviated, usage: .road))
+        }
+        let miles = distance.converted(to: .miles)
+        if miles.value < 0.1 {
+            // Nearest 10 ft, since more precision than that would be false.
+            let feet = (distance.converted(to: .feet).value / 10).rounded() * 10
+            return Measurement(value: feet, unit: UnitLength.feet)
+                .formatted(.measurement(width: .abbreviated, usage: .asProvided, numberFormatStyle: .number.precision(.fractionLength(0))))
+        }
+        let decimals = miles.value < 10 ? 1 : 0
+        return miles.formatted(.measurement(width: .abbreviated, usage: .asProvided, numberFormatStyle: .number.precision(.fractionLength(decimals))))
     }
 }
 
@@ -100,35 +113,39 @@ struct RestoreGauge: View {
     }
 }
 
-/// Draws a gauge as an arc over the top half of a circle, with the value in the middle
+/// Draws a gauge as an arc over the top half of a circle, with the value centered inside it
 /// and the minimum and maximum labels beneath each end.
 struct RestoreArcGaugeStyle: GaugeStyle {
     var tint: Color
-    var lineWidth: CGFloat = 16
+
+    /// The arc's thickness for an arc of the given width: 16 pt on a full-size gauge, thinner as a
+    /// short card shrinks the arc, so a small arc keeps the same proportions instead of turning chunky.
+    static func lineWidth(forArcWidth width: CGFloat) -> CGFloat {
+        min(16, max(6, width / 22))
+    }
 
     func makeBody(configuration: Configuration) -> some View {
         VStack(spacing: 6) {
-            ZStack(alignment: .bottom) {
-                HalfArc(inset: lineWidth / 2)
-                    .stroke(.quaternary, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                HalfArc(inset: lineWidth / 2)
-                    .trim(from: 0, to: configuration.value)
-                    .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-
-                VStack(spacing: 2) {
+            ZStack {
+                HalfArc()
+                    .fill(.quaternary)
+                HalfArc(progress: configuration.value)
+                    .fill(tint)
+            }
+            .aspectRatio(2, contentMode: .fit)
+            .overlay {
+                ArcCenterLabels {
                     configuration.label
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                } value: {
                     configuration.currentValueLabel
                         .font(.largeTitle.weight(.light))
                         .monospacedDigit()
                         .foregroundStyle(tint)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
                 }
-                .padding(.horizontal, lineWidth * 2.5)
+                .lineLimit(1)
             }
-            .aspectRatio(2, contentMode: .fit)
 
             HStack {
                 configuration.minimumValueLabel
@@ -141,16 +158,102 @@ struct RestoreArcGaugeStyle: GaugeStyle {
     }
 }
 
-/// The upper half of a circle, sitting on the bottom edge of its frame.
+/// The caption and value inside the arc, set a little below its middle so they look centered under
+/// the dome rather than riding high. They keep their natural size
+/// when they fit. In a smaller arc the caption fades out first, then the value scales down, so the
+/// text never crowds the arc or turns tiny.
+private struct ArcCenterLabels<Caption: View, Value: View>: View {
+    @ViewBuilder var caption: Caption
+    @ViewBuilder var value: Value
+
+    /// The arc's frame.
+    @State private var available = CGSize.zero
+    @State private var captionSize = CGSize.zero
+    @State private var valueSize = CGSize.zero
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private let captionSpacing: CGFloat = 2
+    /// How far down the arc's frame the text centers. A dome's open space sits low, so true center
+    /// looks too high.
+    private let verticalPosition: CGFloat = 0.6
+
+    var body: some View {
+        let showsCaption = self.showsCaption
+        Color.clear
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { available = $0 }
+            .overlay {
+                value
+                    .fixedSize()
+                    .onGeometryChange(for: CGSize.self) { $0.size } action: { valueSize = $0 }
+                    .overlay(alignment: .top) {
+                        caption
+                            .fixedSize()
+                            .onGeometryChange(for: CGSize.self) { $0.size } action: { captionSize = $0 }
+                            .alignmentGuide(.top) { $0[.bottom] + captionSpacing }
+                            .opacity(showsCaption ? 1 : 0)
+                    }
+                    .scaleEffect(showsCaption ? 1 : valueScale)
+                    // Centers the caption and value together, or the value alone, at the optical center.
+                    .offset(y: (showsCaption ? (captionSize.height + captionSpacing) / 2 : 0)
+                        + available.height * (verticalPosition - 0.5))
+            }
+            .animation(reduceMotion ? nil : .default, value: showsCaption)
+    }
+
+    /// True when the caption and value both fit at their natural size.
+    private var showsCaption: Bool {
+        let width = max(captionSize.width, valueSize.width)
+        let height = captionSize.height + captionSpacing + valueSize.height
+        return fittingScale(width: width, height: height) >= 1
+    }
+
+    /// The value's scale when it's shown alone, never enlarged.
+    private var valueScale: CGFloat {
+        min(1, fittingScale(width: valueSize.width, height: valueSize.height))
+    }
+
+    /// The largest scale at which a box of this size, centered at the optical center, stays clear of
+    /// the arc's inner edge.
+    private func fittingScale(width: CGFloat, height: CGFloat) -> CGFloat {
+        guard width > 0, height > 0, available.width > 0 else { return 1 }
+        let lineWidth = RestoreArcGaugeStyle.lineWidth(forArcWidth: available.width)
+        // The arc's inner edge, less a margin so text doesn't touch it.
+        let radius = min(available.width / 2, available.height) - lineWidth - 6
+        // The box's center, measured up from the arc's center on the bottom edge.
+        let middle = available.height * (1 - verticalPosition)
+        guard radius > middle else { return 0 }
+        // The box's top corners, at (±s·w/2, middle + s·h/2) from the arc's center, must lie
+        // within the radius: solve a·s² + b·s + c = 0 for the largest s.
+        let a = (width / 2) * (width / 2) + (height / 2) * (height / 2)
+        let b = middle * height
+        let c = middle * middle - radius * radius
+        let corners = (-b + (b * b - 4 * a * c).squareRoot()) / (2 * a)
+        // Its bottom must also stay above the arc's ends.
+        let bottom = 2 * middle / height
+        return max(min(corners, bottom), 0)
+    }
+}
+
+/// The upper half of a circle, sitting on the bottom edge of its frame, drawn as a filled stroke
+/// whose thickness follows the arc's size. `progress` trims it from the left end and animates.
 private struct HalfArc: Shape {
-    var inset: CGFloat
+    var progress: Double = 1
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
 
     func path(in rect: CGRect) -> Path {
-        let center = CGPoint(x: rect.midX, y: rect.maxY - inset)
-        let radius = min(rect.width / 2, rect.height) - inset
+        let lineWidth = RestoreArcGaugeStyle.lineWidth(forArcWidth: rect.width)
+        let center = CGPoint(x: rect.midX, y: rect.maxY - lineWidth / 2)
+        let radius = min(rect.width / 2, rect.height) - lineWidth / 2
         var path = Path()
         path.addArc(center: center, radius: radius, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+        guard progress > 0 else { return Path() }
         return path
+            .trimmedPath(from: 0, to: min(progress, 1))
+            .strokedPath(StrokeStyle(lineWidth: lineWidth, lineCap: .round))
     }
 }
 
@@ -190,19 +293,15 @@ struct NearbyOutageRow: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Label {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(outage.distanceText(from: origin) ?? "—")
-                        if let placeName {
-                            Text(Places.streetAndCity(placeName))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                                .transition(.opacity)
-                        }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(outage.distanceText(from: origin) ?? "—")
+                    if let placeName {
+                        Text(Places.streetAndCity(placeName))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .transition(.opacity)
                     }
-                } icon: {
-                    Image(systemName: "mappin.and.ellipse")
                 }
                 OutageKindBadge(isPlanned: outage.isPlanned)
             }
@@ -238,57 +337,120 @@ struct OutageDetailView: View {
     let origin: CLLocationCoordinate2D?
     var placeName: String?
 
+    @State private var isWiderThanTall = false
+
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// The side the system moves the bars to, as on the outer display of iPhone Duo, or nil.
+    @Environment(\.toolbarVerticalEdge) private var toolbarVerticalEdge
+
     var body: some View {
-        List {
-            Group {
-                Section {
-                    OutageSummary(outage: outage)
-                }
-                Section("Details") {
-                    if let customers = outage.impactedCustomers {
-                        LabeledContent("Customers affected", value: customers, format: .number)
-                    }
-                    if let start = outage.start {
-                        LabeledContent("Started", value: start, format: .dateTime.weekday().hour().minute())
-                    }
-                    if let county = outage.county {
-                        LabeledContent("County", value: county.capitalized)
-                    }
-                }
+        content
+            .onGeometryChange(for: Bool.self) { $0.size.width > $0.size.height } action: {
+                isWiderThanTall = $0
             }
-            .listRowBackground(Color.cardBackground)
+            .scrollContentBackground(.hidden)
+        .background { PageBackground() }
+        .modifier(AdaptiveNavigationTitle(
+            title: title,
+            subtitle: placeName ?? "",
+            isPinned: pinsTitle
+        ))
+    }
+
+    /// True when the list pins its own title, as the main screen does, because the navigation bar
+    /// shows no title once the large title scrolls away.
+    private var pinsTitle: Bool {
+        !isSideBySide && toolbarVerticalEdge != nil
+    }
+
+    /// Side by side, the title is just "Outage" before the address, without the distance.
+    private var title: String {
+        if isSideBySide { return String(localized: "Outage") }
+        return outage.distanceText(from: origin).map { String(localized: "Outage \($0) Away") } ?? String(localized: "Nearby Outage")
+    }
+
+    private var isSideBySide: Bool {
+        horizontalSizeClass == .regular && isWiderThanTall
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if isSideBySide {
+            // On a wide display, such as the inner display of iPhone Duo in landscape, the restore
+            // gauge and the details sit in their own panes, clear of the fold, instead of one list
+            // stretched across both halves with the details pushed off the bottom.
+            ArrangementView {
+                List {
+                    summarySection(header: "Status")
+                        .listRowBackground(Color.cardBackground)
+                }
+                // Half the system gutter on the shared edge, so the cards sit a standard spacing apart.
+                .contentMargins(.trailing, 10, for: .scrollContent)
+            } secondary: {
+                List {
+                    detailsSection
+                        .listRowBackground(Color.cardBackground)
+                }
+                .contentMargins(.leading, 10, for: .scrollContent)
+            }
+            .arrangementViewStyle(.split.axes(.horizontal))
+            // Both cards usually fit, so the panes stay still unless large text makes them overflow.
+            .scrollBounceBehavior(.basedOnSize)
+        } else {
+            List {
+                Group {
+                    summarySection(header: nil)
+                    detailsSection
+                }
+                .listRowBackground(Color.cardBackground)
+            }
+            .modifier(PinnedTitle(title: title, detail: placeName ?? "", isActive: pinsTitle))
         }
-        .scrollContentBackground(.hidden)
-        .background(Color.pageBackground)
-        .navigationTitle(outage.distanceText(from: origin).map { String(localized: "Outage \($0) Away") } ?? String(localized: "Nearby Outage"))
-        .navigationSubtitle(placeName ?? "")
-        .toolbar {
-            ToolbarItem(placement: .largeSubtitle) {
-                LargeSubtitle(text: placeName ?? "")
+    }
+
+    /// The restore gauge card. Beside the details it gets a header too, so both cards start level.
+    private func summarySection(header: LocalizedStringKey?) -> some View {
+        Section {
+            OutageSummary(outage: outage)
+        } header: {
+            if let header {
+                // White stays readable on the blue background.
+                Text(header)
+                    .foregroundStyle(.white)
             }
         }
-        .navigationBarTitleDisplayMode(.large)
+    }
+
+    private var detailsSection: some View {
+        OutageDetailsSection(outage: outage)
     }
 }
 
-// MARK: - Large subtitle
+// MARK: - Details section
 
-/// An address shown under a large navigation title, aligned with it. Regular weight keeps the
-/// title as the single primary heading, while the size keeps the address easy to read.
-struct LargeSubtitle: View {
-    let text: String
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+/// Customers affected, start time and county for an outage, shared by the main screen and the
+/// detail screen. Left out entirely when the feed has none of them, so no empty card shows.
+struct OutageDetailsSection: View {
+    let outage: Outage
 
     var body: some View {
-        Text(text)
-            .font(.title3)
-            .foregroundStyle(.secondary)
-            .lineLimit(2)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentTransition(.opacity)
-            .animation(reduceMotion ? nil : .default, value: text)
+        if outage.impactedCustomers != nil || outage.start != nil || outage.county != nil {
+            Section {
+                if let customers = outage.impactedCustomers {
+                    LabeledContent("Customers affected", value: customers, format: .number)
+                }
+                if let start = outage.start {
+                    LabeledContent("Started", value: start, format: .dateTime.weekday().hour().minute())
+                }
+                if let county = outage.county {
+                    LabeledContent("County", value: county.capitalized)
+                }
+            } header: {
+                // White stays readable on the blue background.
+                Text("Details")
+                    .foregroundStyle(.white)
+            }
+        }
     }
 }
 
@@ -315,5 +477,135 @@ struct LargeSubtitle: View {
                     OutageDetailView(outage: outage, origin: store.location?.coordinate, placeName: "105 El Cerrito Ave, San Rafael")
                 }
             }
+    }
+}
+
+// MARK: - Navigation title
+
+/// A large navigation title with the address run on after it, in orange and white, as the year
+/// follows the month in Calendar. It's the same on every display and with the bars in any position.
+/// It goes in the large title area rather than the bar's title slot, which is only one line tall
+/// and cut the address off, so the address never truncates and wraps onto as many lines as it needs.
+/// The navigation title still provides the collapsed title and the accessibility label.
+struct AdaptiveNavigationTitle: ViewModifier {
+    let title: String
+    let subtitle: String
+    /// True when the screen pins its own title with `PinnedTitle`, so the bar shows no title at all.
+    var isPinned = false
+
+    func body(content: Content) -> some View {
+        content
+            // Still named, for the back button's menu and accessibility.
+            .navigationTitle(title)
+            .toolbarTitleDisplayMode(isPinned ? .inline : .large)
+            .toolbar {
+                if isPinned {
+                    // An empty title view, so the bar doesn't repeat the pinned title above it.
+                    ToolbarItem(placement: .principal) {
+                        Color.clear
+                            .frame(width: 0, height: 0)
+                            .accessibilityHidden(true)
+                    }
+                } else {
+                    ToolbarItem(placement: .largeTitle) {
+                        SideBarTitle(title: title, detail: subtitle)
+                    }
+                    // Once scrolling collapses the large title, the bar shows only the plain title,
+                    // so the address follows as secondary text beneath it. This slot is only used
+                    // inline, so the expanded run-on title is unchanged.
+                    if !subtitle.isEmpty {
+                        ToolbarItem(placement: .subtitle) {
+                            Text(subtitle)
+                        }
+                    }
+                }
+            }
+    }
+}
+
+/// Pins the run-on title above a list, for displays where the system moves the bars to the side,
+/// such as the outer display of iPhone Duo. There the navigation bar shows no title once the large
+/// title scrolls away, so the address would leave the screen. Content fades out under the title
+/// and, more lightly, at the bottom edge.
+struct PinnedTitle: ViewModifier {
+    let title: String
+    let detail: String
+    var isActive: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .safeAreaBar(edge: .top) {
+                if isActive {
+                    SideBarTitle(title: title, detail: detail)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+                        .padding(.bottom, PaneScrim.titleBottomSpacing)
+                        .background { PaneScrim() }
+                }
+            }
+            // The scrims replace the system's edge effects, which barely show over white cards.
+            .scrollEdgeEffectHidden(isActive, for: [.top, .bottom])
+            .overlay(alignment: .bottom) {
+                if isActive {
+                    // Nothing sits at the bottom with the bars at the side, so a short, light
+                    // fade is enough.
+                    PaneScrim(edge: .bottom)
+                        .frame(height: 48)
+                        .opacity(0.8)
+                        .allowsHitTesting(false)
+                }
+            }
+    }
+}
+
+/// The title in PG&E orange followed by the detail in white, such as "Outages Van Ness, San Francisco".
+/// The detail wraps onto more lines rather than truncating, so the full address always shows.
+struct SideBarTitle: View {
+    let title: String
+    let detail: String
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Text("\(Text(title).foregroundStyle(.pgeOrange)) \(Text(detail).foregroundStyle(.white))")
+            // The size the system uses for large titles inside the bar, as in Files.
+            .font(.title.bold())
+            .fixedSize(horizontal: false, vertical: true)
+            // Fill the title slot so the text starts at the leading edge, as in Files.
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentTransition(.opacity)
+            .animation(reduceMotion ? nil : .default, value: detail)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+// MARK: - Page background
+
+/// A flat PG&E blue, or PG&E navy in dark mode.
+struct PageBackground: View {
+    var body: some View {
+        Color.pageBackground
+            .ignoresSafeArea()
+    }
+}
+
+// MARK: - Disclaimer
+
+/// Makes clear this isn't PG&E's app and points people to PG&E's own outage map for safety.
+struct OfficialOutagesNotice: View {
+    private static let officialURL = URL(string: "https://pgealerts.alerts.pge.com/outage-tools/outage-map/")!
+
+    var body: some View {
+        Text("This is not an official PG&E app. If safety is a concern, please visit \(link).")
+            .foregroundStyle(.white)
+            // Blue link text gets lost on the blue background, so the link is white and underlined.
+            .tint(.white)
+    }
+
+    private var link: AttributedString {
+        var link = AttributedString(localized: "PG&E’s official outages service")
+        link.link = Self.officialURL
+        link.underlineStyle = .single
+        return link
     }
 }

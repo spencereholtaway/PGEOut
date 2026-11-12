@@ -157,11 +157,15 @@ enum Places {
         // MKAddressRepresentations doesn't expose state or county, which the
         // service-territory check needs, so read them from the placemark.
         let placemark = item.placemark
+        // Reverse-geocoded titles like "Van Ness, San Francisco" already include the city,
+        // so skip the city line rather than repeat it.
+        let city = item.addressRepresentations?.cityName
+        let titleHasCity = city.map { title.localizedStandardContains($0) } ?? false
         return SavedLocation(
             latitude: coordinate.latitude,
             longitude: coordinate.longitude,
             title: title,
-            subtitle: item.addressRepresentations?.cityWithContext(.short),
+            subtitle: titleHasCity ? nil : item.addressRepresentations?.cityWithContext(.short),
             state: placemark.administrativeArea,
             county: placemark.subAdministrativeArea
         )
