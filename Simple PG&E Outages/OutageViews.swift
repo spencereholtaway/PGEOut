@@ -181,15 +181,32 @@ struct OutageSummary: View {
 struct NearbyOutageRow: View {
     let outage: Outage
     let origin: CLLocationCoordinate2D?
+    /// Roughly where the outage is, once it has been looked up.
+    var placeName: String?
 
     @Environment(\.now) private var now
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Label(outage.distanceText(from: origin) ?? "—", systemImage: "mappin.and.ellipse")
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(outage.distanceText(from: origin) ?? "—")
+                        if let placeName {
+                            Text(Places.streetAndCity(placeName))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .transition(.opacity)
+                        }
+                    }
+                } icon: {
+                    Image(systemName: "mappin.and.ellipse")
+                }
                 OutageKindBadge(isPlanned: outage.isPlanned)
             }
+            .animation(reduceMotion ? nil : .default, value: placeName)
             Spacer()
             if let remaining = outage.remainingText(at: now) {
                 Text(remaining)
@@ -219,26 +236,59 @@ struct NearbyOutageRow: View {
 struct OutageDetailView: View {
     let outage: Outage
     let origin: CLLocationCoordinate2D?
+    var placeName: String?
 
     var body: some View {
         List {
-            Section {
-                OutageSummary(outage: outage)
+            Group {
+                Section {
+                    OutageSummary(outage: outage)
+                }
+                Section("Details") {
+                    if let customers = outage.impactedCustomers {
+                        LabeledContent("Customers affected", value: customers, format: .number)
+                    }
+                    if let start = outage.start {
+                        LabeledContent("Started", value: start, format: .dateTime.weekday().hour().minute())
+                    }
+                    if let county = outage.county {
+                        LabeledContent("County", value: county.capitalized)
+                    }
+                }
             }
-            Section("Details") {
-                if let customers = outage.impactedCustomers {
-                    LabeledContent("Customers affected", value: customers, format: .number)
-                }
-                if let start = outage.start {
-                    LabeledContent("Started", value: start, format: .dateTime.weekday().hour().minute())
-                }
-                if let county = outage.county {
-                    LabeledContent("County", value: county.capitalized)
-                }
+            .listRowBackground(Color.cardBackground)
+        }
+        .scrollContentBackground(.hidden)
+        .background(Color.pageBackground)
+        .navigationTitle(outage.distanceText(from: origin).map { String(localized: "Outage \($0) Away") } ?? String(localized: "Nearby Outage"))
+        .navigationSubtitle(placeName ?? "")
+        .toolbar {
+            ToolbarItem(placement: .largeSubtitle) {
+                LargeSubtitle(text: placeName ?? "")
             }
         }
-        .navigationTitle(outage.distanceText(from: origin).map { String(localized: "Outage \($0) Away") } ?? String(localized: "Nearby Outage"))
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
+    }
+}
+
+// MARK: - Large subtitle
+
+/// An address shown under a large navigation title, aligned with it. Regular weight keeps the
+/// title as the single primary heading, while the size keeps the address easy to read.
+struct LargeSubtitle: View {
+    let text: String
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Text(text)
+            .font(.title3)
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentTransition(.opacity)
+            .animation(reduceMotion ? nil : .default, value: text)
     }
 }
 
@@ -249,7 +299,21 @@ struct OutageDetailView: View {
             OutageSummary(outage: outage)
         }
         ForEach(store.nearby) { outage in
-            NearbyOutageRow(outage: outage, origin: store.location?.coordinate)
+            NearbyOutageRow(outage: outage, origin: store.location?.coordinate, placeName: store.placeNames[outage.id])
         }
+    }
+}
+
+#Preview("Detail") {
+    let store = OutageStore.preview()
+    // Pushed onto a root screen, as in the app, so the back button shows.
+    NavigationStack {
+        Text("Outages")
+            .navigationTitle("Outages")
+            .navigationDestination(isPresented: .constant(true)) {
+                if let outage = store.nearby.first {
+                    OutageDetailView(outage: outage, origin: store.location?.coordinate, placeName: "105 El Cerrito Ave, San Rafael")
+                }
+            }
     }
 }

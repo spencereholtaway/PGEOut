@@ -20,6 +20,9 @@ final class OutageStore {
     /// Up to three other outages within 50 miles, closest first.
     private(set) var nearby: [Outage] = []
     private(set) var lastChecked: Date?
+    /// Street-and-city descriptions of nearby outages, looked up once per outage.
+    private(set) var placeNames: [Outage.ID: String] = [:]
+    @ObservationIgnored private var placeLookups: Set<Outage.ID> = []
 
     @ObservationIgnored private let service = OutageService()
     @ObservationIgnored private var knownIDs: Set<Int> = []
@@ -38,6 +41,18 @@ final class OutageStore {
             self.location = location
         } else if let data = UserDefaults.standard.data(forKey: Self.storageKey) {
             self.location = try? JSONDecoder().decode(SavedLocation.self, from: data)
+        }
+    }
+
+    /// Looks up where an outage is, at most once per outage, so refreshes don't repeat the request.
+    func lookUpPlaceName(for outage: Outage) async {
+        guard !isPreview, let centroid = outage.centroid,
+              placeLookups.insert(outage.id).inserted else { return }
+        if let name = await Places.placeName(for: centroid) {
+            placeNames[outage.id] = name
+        } else {
+            // Allow another try next time the row appears.
+            placeLookups.remove(outage.id)
         }
     }
 
@@ -170,6 +185,7 @@ extension OutageStore {
                 .sample(id: "3", planned: false, cause: "PATROLLING", near: home.coordinate, offset: 0.06),
                 .sample(id: "4", planned: false, cause: nil, near: home.coordinate, offset: 0.2),
             ]
+            store.placeNames = ["2": "Van Ness Ave, San Francisco", "3": "Lombard St, San Francisco", "4": "Bridgeway, Sausalito"]
         }
         return store
     }

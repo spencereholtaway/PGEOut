@@ -24,24 +24,32 @@ struct ContentView: View {
         TimelineView(.everyMinute) { context in
             NavigationStack {
                 content
+                    .scrollContentBackground(.hidden)
+                    .background(Color.pageBackground)
                     .navigationTitle("Outages")
                     .navigationSubtitle(addressLine)
-                    .navigationDestination(for: Outage.self) { outage in
-                        OutageDetailView(outage: outage, origin: store.location?.coordinate)
-                    }
-                    .searchable(text: $completer.query, isPresented: $isSearching, prompt: "Search for an address")
-                    .searchSuggestions { suggestions }
                     .toolbar {
-                        ToolbarItem(placement: .primaryAction) {
+                        ToolbarItem(placement: .largeSubtitle) {
+                            LargeSubtitle(text: addressLine)
+                        }
+                        // Both ways of choosing a location sit together at the bottom, within thumb reach.
+                        DefaultToolbarItem(kind: .search, placement: .bottomBar)
+                        ToolbarSpacer(.fixed, placement: .bottomBar)
+                        ToolbarItem(placement: .bottomBar) {
                             Button("Use My Location", systemImage: "location.fill", action: useCurrentLocation)
                                 .disabled(isLocating)
                         }
                     }
+                    .navigationDestination(for: Outage.self) { outage in
+                        OutageDetailView(outage: outage, origin: store.location?.coordinate, placeName: store.placeNames[outage.id])
+                    }
+                    .searchable(text: $completer.query, isPresented: $isSearching, prompt: "Search for an address")
+                    .searchSuggestions { suggestions }
                     .refreshable { await store.load() }
-                    .alert("Couldn’t Find Location", isPresented: .constant(errorMessage != nil)) {
-                        Button("OK") { errorMessage = nil }
-                    } message: {
-                        Text(errorMessage ?? "")
+                    .alert("Couldn’t Find Location", item: $errorMessage) { _ in
+                        Button("OK") {}
+                    } message: { message in
+                        Text(message)
                     }
             }
             .environment(\.now, context.date)
@@ -92,9 +100,12 @@ struct ContentView: View {
             welcome
         } else {
             List {
-                statusSection
-                nearbySection
-                reportSection
+                Group {
+                    statusSection
+                    nearbySection
+                    reportSection
+                }
+                .listRowBackground(Color.cardBackground)
             }
         }
     }
@@ -154,7 +165,15 @@ struct ContentView: View {
             Section("Nearby Outages") {
                 ForEach(store.nearby) { outage in
                     NavigationLink(value: outage) {
-                        NearbyOutageRow(outage: outage, origin: store.location?.coordinate)
+                        NearbyOutageRow(outage: outage, origin: store.location?.coordinate, placeName: store.placeNames[outage.id])
+                    }
+                    .task(id: outage.id) { await store.lookUpPlaceName(for: outage) }
+                    .contextMenu {
+                        if let centroid = outage.centroid {
+                            Button("Open in Maps", systemImage: "map") {
+                                openInMaps(centroid, name: store.placeNames[outage.id])
+                            }
+                        }
                     }
                 }
             }
@@ -169,11 +188,8 @@ struct ContentView: View {
                     Label("Report an Outage", systemImage: "exclamationmark.bubble")
                 }
             } footer: {
-                VStack(alignment: .leading, spacing: 4) {
-                    if let lastChecked = store.lastChecked {
-                        Text("Last updated \(lastChecked, format: .dateTime.hour().minute())")
-                    }
-                    Text("Designed and built (with Claude), Spencer Holtaway 2026")
+                if let lastChecked = store.lastChecked {
+                    Text("Last updated \(lastChecked, format: .dateTime.hour().minute())")
                 }
             }
         }
@@ -212,6 +228,13 @@ struct ContentView: View {
     private var addressLine: String {
         guard let location = store.location else { return "" }
         return [location.title, location.subtitle].compactMap(\.self).joined(separator: ", ")
+    }
+
+    /// Shows where an outage is in the Maps app.
+    private func openInMaps(_ coordinate: CLLocationCoordinate2D, name: String?) {
+        let item = MKMapItem(location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude), address: nil)
+        item.name = name.map { String(localized: "Outage near \($0)") } ?? String(localized: "Outage")
+        item.openInMaps()
     }
 
     private func choose(_ completion: MKLocalSearchCompletion) {

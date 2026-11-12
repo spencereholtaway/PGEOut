@@ -83,6 +83,20 @@ enum Places {
         return saved
     }
 
+    /// A short street-and-city description of a coordinate, such as "Van Ness, San Francisco".
+    static func placeName(for coordinate: CLLocationCoordinate2D) async -> String? {
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        guard let request = MKReverseGeocodingRequest(location: location),
+              let item = try? await request.mapItems.first else { return nil }
+        return item.address?.shortAddress ?? item.addressRepresentations?.cityWithContext(.short)
+    }
+
+    /// Drops a leading house number, turning "1528 Leavenworth St, San Francisco"
+    /// into "Leavenworth St, San Francisco".
+    static func streetAndCity(_ address: String) -> String {
+        address.replacing(/^\d[\d\-]*[A-Za-z]?\s+/, with: "")
+    }
+
     /// A fix this accurate is plenty to find the outage polygon covering it.
     private static let acceptableAccuracy: CLLocationAccuracy = 100
 
