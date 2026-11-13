@@ -20,7 +20,7 @@ struct WelcomeView: View {
                     VStack(spacing: 4) {
                         Text("Welcome to")
                         Text(Self.appName)
-                            .foregroundStyle(.tint)
+                            .foregroundStyle(.pgeOrange)
                     }
                     .font(.largeTitle.bold())
                     .accessibilityElement(children: .combine)
@@ -28,7 +28,6 @@ struct WelcomeView: View {
 
                     Text("Covering PG&E in California")
                         .font(.title3)
-                        .foregroundStyle(.secondary)
                 }
                 .multilineTextAlignment(.center)
 
@@ -54,6 +53,9 @@ struct WelcomeView: View {
                     actions
                 }
             }
+            // White text with a PG&E orange accent, as on the outages screen. The tint and gray
+            // secondary text would disappear into the blue background.
+            .foregroundStyle(.white)
             .frame(maxWidth: 520)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 32)
@@ -71,6 +73,9 @@ struct WelcomeView: View {
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { availableHeight = $0 }
+        // A deeper blue than the outages screen in light mode, so white text and the orange
+        // accent meet accessibility contrast guidelines. Dark mode matches the outages screen.
+        .background { Color.welcomeBackground.ignoresSafeArea() }
         .animation(reduceMotion ? nil : .default, value: pinsActions)
     }
 
@@ -95,14 +100,16 @@ struct WelcomeView: View {
             .controlSize(.extraLarge)
             .disabled(isLocating)
 
-            // Glass reads clearly on any part of the gradient, where blue text wouldn't.
+            // Plain glass brightens the blue behind it, so it's tinted with the background color
+            // to keep the white label within accessibility contrast guidelines.
             Button {
                 onSearch()
             } label: {
                 Label("Search for an Address", systemImage: "magnifyingglass")
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.glass(.regular.tint(.welcomeBackground)))
             .controlSize(.extraLarge)
 
             VStack(spacing: 6) {
@@ -110,7 +117,7 @@ struct WelcomeView: View {
                     .foregroundStyle(.white)
                 OfficialOutagesNotice()
             }
-            .font(.footnote)
+            .font(.subheadline)
             .multilineTextAlignment(.center)
         }
         // Pinned or scrolling, the actions get the same width, so their height is stable.
@@ -136,7 +143,7 @@ private struct FeatureRow: View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: systemImage)
                 .font(.title)
-                .foregroundStyle(.tint)
+                .foregroundStyle(.pgeOrange)
                 .frame(width: 44)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
@@ -144,7 +151,6 @@ private struct FeatureRow: View {
                     .font(.headline)
                 Text(detail)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

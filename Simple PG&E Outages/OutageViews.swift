@@ -315,10 +315,9 @@ struct NearbyOutageRow: View {
                     .contentTransition(.numericText())
             }
             Gauge(value: outage.progress(at: now)) {
-                Text("Restore progress")
+                EmptyView()
             } currentValueLabel: {
-                Image(systemName: outage.isPlanned ? "wrench.fill" : "bolt.fill")
-                    .foregroundStyle(outage.tint)
+                EmptyView()
             }
             .gaugeStyle(.accessoryCircularCapacity)
             .tint(outage.tint)
@@ -334,7 +333,6 @@ struct NearbyOutageRow: View {
 /// Full information about an outage reached from the nearby list.
 struct OutageDetailView: View {
     let outage: Outage
-    let origin: CLLocationCoordinate2D?
     var placeName: String?
 
     @State private var isWiderThanTall = false
@@ -353,7 +351,7 @@ struct OutageDetailView: View {
         .modifier(AdaptiveNavigationTitle(
             title: title,
             subtitle: placeName ?? "",
-            isPinned: pinsTitle
+            placement: isSideBySide ? .bar : pinsTitle ? .pinned : .list
         ))
     }
 
@@ -363,10 +361,9 @@ struct OutageDetailView: View {
         !isSideBySide && toolbarVerticalEdge != nil
     }
 
-    /// Side by side, the title is just "Outage" before the address, without the distance.
+    /// Just "Outage" before the address, without the distance.
     private var title: String {
-        if isSideBySide { return String(localized: "Outage") }
-        return outage.distanceText(from: origin).map { String(localized: "Outage \($0) Away") } ?? String(localized: "Nearby Outage")
+        String(localized: "Outage")
     }
 
     private var isSideBySide: Bool {
@@ -398,6 +395,9 @@ struct OutageDetailView: View {
             .scrollBounceBehavior(.basedOnSize)
         } else {
             List {
+                if !pinsTitle {
+                    ListTitle(title: title, detail: placeName ?? "")
+                }
                 Group {
                     summarySection(header: nil)
                     detailsSection
@@ -474,7 +474,7 @@ struct OutageDetailsSection: View {
             .navigationTitle("Outages")
             .navigationDestination(isPresented: .constant(true)) {
                 if let outage = store.nearby.first {
-                    OutageDetailView(outage: outage, origin: store.location?.coordinate, placeName: "105 El Cerrito Ave, San Rafael")
+                    OutageDetailView(outage: outage, placeName: "105 El Cerrito Ave, San Rafael")
                 }
             }
     }
@@ -482,29 +482,83 @@ struct OutageDetailsSection: View {
 
 // MARK: - Navigation title
 
-/// A large navigation title with the address run on after it, in orange and white, as the year
-/// follows the month in Calendar. It's the same on every display and with the bars in any position.
-/// It goes in the large title area rather than the bar's title slot, which is only one line tall
-/// and cut the address off, so the address never truncates and wraps onto as many lines as it needs.
-/// The navigation title still provides the collapsed title and the accessibility label.
+/// Where a screen shows its run-on title.
+enum TitlePlacement {
+    /// The first row of the screen's list, with the bar showing a compact title once it scrolls
+    /// away. It slides with its screen when navigating, as the bar's large title area doesn't:
+    /// with custom content there, the bar draws both screens' titles on top of each other.
+    case list
+    /// Pinned above the list with `PinnedTitle`, so the bar shows no title at all.
+    case pinned
+    /// The bar's large title area, above side-by-side panes.
+    case bar
+}
+
+/// The navigation title for a screen with the run-on title, in orange and white, as the year
+/// follows the month in Calendar. The address never truncates and wraps onto as many lines as it
+/// needs. The navigation title still names the screen for the back button and accessibility.
 struct AdaptiveNavigationTitle: ViewModifier {
     let title: String
     let subtitle: String
-    /// True when the screen pins its own title with `PinnedTitle`, so the bar shows no title at all.
-    var isPinned = false
+    var placement: TitlePlacement
+
+    /// True once the list's title has scrolled under the bar.
+    @State private var isListTitleHidden = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// How far the list scrolls before the bar shows its compact title, about one title line.
+    private static let compactTitleOffset: CGFloat = 32
 
     func body(content: Content) -> some View {
         content
             // Still named, for the back button's menu and accessibility.
             .navigationTitle(title)
-            .toolbarTitleDisplayMode(isPinned ? .inline : .large)
+            .toolbarTitleDisplayMode(placement == .bar ? .large : .inline)
+            // The list's title starts just below the bar, where a large title sits.
+            .contentMargins(placement == .list ? .top : [], 0, for: .scrollContent)
+            // Only reports a change when the title crosses under the bar, not on every frame.
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                placement == .list && geometry.contentOffset.y + geometry.contentInsets.top > Self.compactTitleOffset
+            } action: { _, isHidden in
+                withAnimation(reduceMotion ? nil : .default) {
+                    isListTitleHidden = isHidden
+                }
+            }
+            // The system's edge effect draws a frosted block that the content shows through. The
+            // bar takes the page's flat blue instead, fading in once the list's title is gone.
+            .scrollEdgeEffectHidden(placement == .list, for: .top)
+            .overlay(alignment: .top) {
+                if placement == .list {
+                    BarScrim()
+                        .opacity(isListTitleHidden ? 1 : 0)
+                        .allowsHitTesting(false)
+                }
+            }
             .toolbar {
-                if isPinned {
+                if placement == .pinned {
                     // An empty title view, so the bar doesn't repeat the pinned title above it.
                     ToolbarItem(placement: .principal) {
                         Color.clear
                             .frame(width: 0, height: 0)
                             .accessibilityHidden(true)
+                    }
+                } else if placement == .list {
+                    // Empty while the list's own title shows, then fades in as it scrolls away.
+                    ToolbarItem(placement: .principal) {
+                        VStack(spacing: 0) {
+                            Text(title)
+                                .font(.headline)
+                            if !subtitle.isEmpty {
+                                Text(subtitle)
+                                    .font(.caption)
+                                    .opacity(0.8)
+                            }
+                        }
+                        // White stays readable on the blue background.
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .opacity(isListTitleHidden ? 1 : 0)
+                        .accessibilityHidden(!isListTitleHidden)
                     }
                 } else {
                     ToolbarItem(placement: .largeTitle) {
@@ -545,16 +599,55 @@ struct PinnedTitle: ViewModifier {
             }
             // The scrims replace the system's edge effects, which barely show over white cards.
             .scrollEdgeEffectHidden(isActive, for: [.top, .bottom])
+            // Room below the last row, so it can scroll clear of the fade.
+            .contentMargins(isActive ? .bottom : [], PaneScrim.edgeFadeHeight, for: .scrollContent)
             .overlay(alignment: .bottom) {
                 if isActive {
                     // Nothing sits at the bottom with the bars at the side, so a short, light
                     // fade is enough.
                     PaneScrim(edge: .bottom)
-                        .frame(height: 48)
+                        .frame(height: PaneScrim.edgeFadeHeight)
                         .opacity(0.8)
                         .allowsHitTesting(false)
                 }
             }
+    }
+}
+
+/// The page's flat blue behind the navigation bar, from the top of the screen to the bar's bottom
+/// edge, then fading out over the content below.
+private struct BarScrim: View {
+    private static let fadeHeight: CGFloat = 16
+
+    var body: some View {
+        LinearGradient(colors: [.pageBackground, .pageBackground.opacity(0)], startPoint: .top, endPoint: .bottom)
+            .frame(height: Self.fadeHeight)
+            .background(alignment: .bottom) {
+                // Reaches up through the bar and the status bar.
+                Color.pageBackground
+                    .padding(.bottom, Self.fadeHeight)
+                    .ignoresSafeArea(edges: .top)
+            }
+    }
+}
+
+/// The run-on title as the first row of a list, where the large title would sit, so it scrolls
+/// and slides with the screen's content.
+struct ListTitle: View {
+    let title: String
+    let detail: String
+
+    var body: some View {
+        // A section header rather than a row, as rows clip their content, cutting off the
+        // overhang of the first letter on each line.
+        Section {
+        } header: {
+            SideBarTitle(title: title, detail: detail)
+                .textCase(nil)
+                .listRowInsets(EdgeInsets())
+        }
+        // As close to the first card as a large title sits.
+        .listSectionSpacing(8)
     }
 }
 

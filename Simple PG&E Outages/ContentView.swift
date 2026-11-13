@@ -12,9 +12,9 @@ struct ContentView: View {
     @State private var isWiderThanTall = false
     /// Space above the last-updated time and disclaimer, so they sit at the bottom when the list is short.
     @State private var footerGap: CGFloat = 0
-    /// Where the section headers start, in global coordinates, so the pinned title lines up with them.
+    /// Where the section headers start, within the status pane, so the pinned title lines up with them.
     @State private var paneHeaderLeading: CGFloat = 20
-    /// Where the pinned title bar starts, in global coordinates.
+    /// Where the pinned title bar starts, within the status pane.
     @State private var titleBarLeading: CGFloat = 0
     /// The pinned title's height, so the pane beside it starts its cards at the same level.
     @State private var paneTitleHeight: CGFloat = 0
@@ -46,7 +46,12 @@ struct ContentView: View {
                     }
                     .scrollContentBackground(.hidden)
                     .background { PageBackground() }
-                    .modifier(AdaptiveNavigationTitle(title: String(localized: "Outages"), subtitle: addressLine))
+                    .modifier(AdaptiveNavigationTitle(
+                        title: String(localized: "Outages"),
+                        subtitle: addressLine,
+                        // Side by side the bar is hidden, with the title pinned above the status pane.
+                        placement: pinsTitle || usesPanes ? .pinned : .list
+                    ))
                     .toolbar {
                         // Both ways of choosing a location sit together at the bottom, within thumb reach.
                         DefaultToolbarItem(kind: .search, placement: .bottomBar)
@@ -57,7 +62,7 @@ struct ContentView: View {
                         }
                     }
                     .navigationDestination(for: Outage.self) { outage in
-                        OutageDetailView(outage: outage, origin: store.location?.coordinate, placeName: store.placeNames[outage.id])
+                        OutageDetailView(outage: outage, placeName: store.placeNames[outage.id])
                     }
                     // The welcome screen has its own title and actions, and searches in a sheet,
                     // so the bars stay hidden until a location is chosen.
@@ -165,6 +170,9 @@ struct ContentView: View {
                     paneTitleBar
                         .background { PaneScrim() }
                 }
+                // Measured within the pane rather than the screen, so the positions don't change,
+                // and the screen doesn't update, on every frame of a navigation slide.
+                .coordinateSpace(.statusPane)
             } secondary: {
                 List {
                     Group {
@@ -199,6 +207,9 @@ struct ContentView: View {
             .scrollEdgeEffectHidden(true, for: .top)
         } else {
             List {
+                if !pinsTitle {
+                    ListTitle(title: String(localized: "Outages"), detail: addressLine)
+                }
                 Group {
                     statusSection
                     detailsSection
@@ -215,12 +226,15 @@ struct ContentView: View {
             // Cards scrolling under the bottom search field fade into the page, like the pane
             // titles do at the top. The system's soft edge effect barely shows over white cards.
             .scrollEdgeEffectHidden(!pinsTitle, for: .bottom)
+            // Room below the last row, so the last-updated time and disclaimer rest above the
+            // scrim's fade instead of under it.
+            .contentMargins(pinsTitle ? [] : .bottom, PaneScrim.searchBarFadeHeight, for: .scrollContent)
             .overlay(alignment: .bottom) {
                 if !pinsTitle {
                     // Tall enough to reach above the search field, and extends down past the
                     // home indicator.
                     PaneScrim(edge: .bottom)
-                        .frame(height: 72)
+                        .frame(height: PaneScrim.searchBarFadeHeight)
                         .allowsHitTesting(false)
                 }
             }
@@ -254,7 +268,7 @@ struct ContentView: View {
             .padding(.top, paneTitleTopPadding)
             // Room below for the scrim's fade, before the section headers.
             .padding(.bottom, PaneScrim.titleBottomSpacing)
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .statusPane) } action: { frame in
                 titleBarLeading = frame.minX
                 paneTitleHeight = frame.height
             }
@@ -419,7 +433,7 @@ struct ContentView: View {
 /// Holds the status for the chosen address in one card of a set height, so it ends level with the
 /// Report an Outage button beside it and never resizes as either pane scrolls.
 private struct StatusPane<Content: View, Details: View>: View {
-    /// Where the section headers start, in global coordinates, so a title above can line up with them.
+    /// Where the section headers start, within the status pane, so a title above can line up with them.
     @Binding var headerLeading: CGFloat
     /// The card's header, such as "At This Address".
     let header: Text
@@ -447,7 +461,7 @@ private struct StatusPane<Content: View, Details: View>: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                     .contentTransition(.opacity)
-                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minX } action: {
+                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .statusPane).minX } action: {
                         headerLeading = $0
                     }
             }
@@ -475,6 +489,11 @@ struct PaneScrim: View {
     /// The top scrim's fade. It runs through the space below the title, so the scrim is solid
     /// behind the title itself and content never shows through it.
     private static let topFadeHeight: CGFloat = titleBottomSpacing + topFadeOverhang
+    /// The bottom scrim's height above the search field. Lists leave this much room below their
+    /// content, so the last rows can scroll clear of it.
+    static let searchBarFadeHeight: CGFloat = 72
+    /// The lighter bottom scrim's height when the bars sit at the side.
+    static let edgeFadeHeight: CGFloat = 48
 
     var body: some View {
         switch edge {
@@ -527,4 +546,9 @@ private struct SplitPaneGutter: ViewModifier {
 
 #Preview("Welcome") {
     ContentView(store: OutageStore(location: nil))
+}
+
+private extension CoordinateSpaceProtocol where Self == NamedCoordinateSpace {
+    /// The status pane and the title pinned above it.
+    static var statusPane: NamedCoordinateSpace { .named("statusPane") }
 }
